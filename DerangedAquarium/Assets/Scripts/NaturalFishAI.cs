@@ -4,38 +4,87 @@ public class NaturalFishAI : MonoBehaviour
 {
     [Header("Movement Tweaks")]
     public float swimSpeed = 1.2f;
-    public float rushSpeedMultiplier = 1.5f; // Fast swim for food chase
+    public float rushSpeedMultiplier = 1.5f; 
 
     [Header("Tank Boundaries (Safe Zones)")]
     public Vector2 minBounds = new Vector2(-7.5f, -3.5f);
     public Vector2 maxBounds = new Vector2(7.5f, 3.5f);
 
+    [Header("Hunger & Survival Settings")]
+    public float maxHunger = 30f;       
+    public float hungerWarningTime = 15f; 
+    private float currentHunger = 0f;
+    private bool isDead = false;
+
+    // --- NEW GROWTH SETTINGS ---
+    [Header("Growth Settings")]
+    public float startingScale = 0.5f;     // Baby fish start at half size
+    public float maxScale = 1.5f;          // Grown adult fish limit
+    public float growthPerBite = 0.1f;     // Grow by 10% each time they eat
+    private float currentScaleModifier;
+
+    private Color originalColor;
+    private Color sickColor = new Color(0.8f, 0.8f, 0.3f, 1.0f); 
+
     private Vector3 targetDestination;
     private float closeEnoughThreshold = 0.3f;
     
-    // Food tracking variables
     private FishFood currentFoodTarget;
     private bool isChasingFood = false;
-
-    // Visual Component
     private SpriteRenderer spriteRenderer;
 
     void Start()
     {
-        // Grab the sprite renderer attached to this fish so we can flip it
         spriteRenderer = GetComponent<SpriteRenderer>();
-        
-        // Force rotation to be completely flat at start
         transform.rotation = Quaternion.identity;
-        
+
+        // Set the initial baby scale at birth
+        currentScaleModifier = startingScale;
+        UpdateFishScale();
+
+        if (spriteRenderer != null)
+        {
+            originalColor = spriteRenderer.color;
+        }
+        else
+        {
+            originalColor = Color.white;
+        }
+
         PickNewDestination();
     }
 
     void Update()
     {
+        if (isDead)
+        {
+            FloatToSurface();
+            return;
+        }
+
+        HandleHunger();
         FindClosestFood();
         NavigateTank();
         HandleVisualFacing();
+    }
+
+    void HandleHunger()
+    {
+        currentHunger += Time.deltaTime;
+
+        if (currentHunger >= maxHunger)
+        {
+            Die();
+        }
+        else if (currentHunger >= hungerWarningTime)
+        {
+            float starvationProgress = (currentHunger - hungerWarningTime) / (maxHunger - hungerWarningTime);
+            spriteRenderer.color = Color.Lerp(originalColor, sickColor, starvationProgress);
+        }
+        else
+        {
+            spriteRenderer.color = originalColor;
+        }
     }
 
     void FindClosestFood()
@@ -81,10 +130,8 @@ public class NaturalFishAI : MonoBehaviour
             currentSpeed = swimSpeed * rushSpeedMultiplier;
         }
 
-        // Move directly towards the target point without rotating the model
         transform.position = Vector3.MoveTowards(transform.position, targetDestination, currentSpeed * Time.deltaTime);
 
-        // Check if we reached our target
         float distanceToTarget = Vector3.Distance(transform.position, targetDestination);
         
         if (isChasingFood && currentFoodTarget != null)
@@ -94,6 +141,11 @@ public class NaturalFishAI : MonoBehaviour
                 Destroy(currentFoodTarget.gameObject); 
                 currentFoodTarget = null;
                 isChasingFood = false;
+                currentHunger = 0f; 
+
+                // --- TRIGGER GROWTH MECHANIC ---
+                GrowFish();
+
                 PickNewDestination(); 
             }
         }
@@ -103,29 +155,83 @@ public class NaturalFishAI : MonoBehaviour
         }
     }
 
-    void HandleVisualFacing()
+void HandleVisualFacing()
     {
         if (spriteRenderer == null) return;
 
-        // Check if the target destination is to the left or right of the fish
         if (targetDestination.x > transform.position.x)
         {
-            // Target is to the right. 
-            // ASSUMPTION: Your original artwork sprite faces RIGHT by default.
-            spriteRenderer.flipX = false; 
+            // Facing right: keep localScale X positive
+            transform.localScale = new Vector3(Mathf.Abs(transform.localScale.x), transform.localScale.y, transform.localScale.z);
         }
         else if (targetDestination.x < transform.position.x)
         {
-            // Target is to the left. Flip the sprite horizontally!
-            spriteRenderer.flipX = true;
+            // Facing left: invert localScale X to flip the sprite cleanly
+            transform.localScale = new Vector3(-Mathf.Abs(transform.localScale.x), transform.localScale.y, transform.localScale.z);
         }
     }
 
+    // --- GROWTH FUNCTIONS (Re-added) ---
+    void GrowFish()
+    {
+        currentScaleModifier += growthPerBite;
+        if (currentScaleModifier > maxScale)
+        {
+            currentScaleModifier = maxScale;
+        }
+
+        UpdateFishScale();
+        Debug.Log($"Fish ate and grew! Current scale: {currentScaleModifier}");
+    }
+
+    void UpdateFishScale()
+    {
+        float baseWidth = 1.5f;
+        float baseHeight = 0.6f;
+        float directionSign = transform.localScale.x < 0 ? -1f : 1f;
+
+        transform.localScale = new Vector3(
+            baseWidth * currentScaleModifier * directionSign, 
+            baseHeight * currentScaleModifier, 
+            1f
+        );
+    }
+
+    // --- NAVIGATION FUNCTION ---
     void PickNewDestination()
     {
         float targetX = Random.Range(minBounds.x, maxBounds.x);
         float targetY = Random.Range(minBounds.y, maxBounds.y);
         targetDestination = new Vector3(targetX, targetY, 0f);
+    }
+
+    // --- SURVIVAL FUNCTIONS ---
+    void Die()
+    {
+        isDead = true;
+        spriteRenderer.color = new Color(0.3f, 0.3f, 0.3f, 0.7f);
+        transform.rotation = Quaternion.Euler(0, 0, 180f);
+
+        AquariumManager manager = FindFirstObjectByType<AquariumManager>();
+        if (manager != null)
+        {
+            manager.DeductPlantedCash(15); 
+        }
+
+        if (currentFoodTarget != null)
+        {
+            currentFoodTarget.isTargeted = false;
+        }
+
+        Destroy(gameObject, 8f);
+    }
+
+    void FloatToSurface()
+    {
+        if (transform.position.y < maxBounds.y)
+        {
+            transform.Translate(Vector3.down * 0.8f * Time.deltaTime, Space.Self); 
+        }
     }
 
     private void OnDrawGizmosSelected()
@@ -141,4 +247,4 @@ public class NaturalFishAI : MonoBehaviour
         Gizmos.DrawLine(botR, botL);
         Gizmos.DrawLine(botL, topL);
     }
-}
+} // <-- Closes the whole class perfectly!
