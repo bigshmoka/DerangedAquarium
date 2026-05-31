@@ -7,23 +7,30 @@ public class AquariumManager : MonoBehaviour
     [Header("Prefabs")]
     public GameObject foodPrefab;
     public GameObject fishPrefab;
-    public GameObject plantPrefab;
 
     [Header("Economy Settings")]
     public int totalMoney = 100;
     public float incomeInterval = 3f; 
     private float incomeTimer;
 
-    [Header("UI Reference")]
+    [Header("UI Windows")]
     public TMP_Text moneyText; 
+    public GameObject shopMenuWindow; 
 
-    // --- NEW PLACEMENT VARIABLES ---
-    private GameObject activePlantPreview;
-    private bool isPlacingPlant = false;
+    // --- PLACEMENT VARIABLES ---
+    private GameObject activeDecorationPreview;
+    private bool isPlacingDecoration = false;
+    private GameObject selectedDecorationPrefab;
+    private int selectedDecorationCost;
 
     void Start()
     {
         UpdateMoneyUI(); 
+
+        if (shopMenuWindow != null)
+        {
+            shopMenuWindow.SetActive(false);
+        }
 
         if (fishPrefab != null)
         {
@@ -37,10 +44,9 @@ public class AquariumManager : MonoBehaviour
     {
         HandlePassiveIncome();
         
-        // If we are placing a plant, run the placement loop; otherwise, handle standard clicks
-        if (isPlacingPlant)
+        if (isPlacingDecoration)
         {
-            HandlePlantPlacement();
+            HandleDecorationPlacement();
         }
         else
         {
@@ -70,8 +76,8 @@ public class AquariumManager : MonoBehaviour
     {
         if (Input.GetMouseButtonDown(0))
         {
-            // Don't spawn food if clicking the UI bar at the bottom
-            if (Input.mousePosition.y < 150) return;
+            // Block spawning food if clicking inside an open menu pane
+            if (shopMenuWindow != null && shopMenuWindow.activeSelf) return;
 
             Vector3 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
             mousePos.z = 0f; 
@@ -83,49 +89,78 @@ public class AquariumManager : MonoBehaviour
         }
     }
 
-    // --- NEW PLACEMENT LOGIC ---
-    void HandlePlantPlacement()
+    public void OpenShopMenu()
     {
-        // 1. Get current mouse world position
+        if (shopMenuWindow != null)
+        {
+            shopMenuWindow.SetActive(true);
+        }
+    }
+
+    public void CloseShopMenu()
+    {
+        if (shopMenuWindow != null)
+        {
+            shopMenuWindow.SetActive(false);
+        }
+    }
+
+    // Universal purchase function called by TMP grid item slots
+    public void SelectDecorationFromShop(GameObject decorationPrefab, int cost)
+    {
+        if (totalMoney >= cost && decorationPrefab != null && !isPlacingDecoration)
+        {
+            selectedDecorationPrefab = decorationPrefab;
+            selectedDecorationCost = cost;
+
+            CloseShopMenu();
+
+            Vector3 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+            mousePos.z = 0f;
+
+            activeDecorationPreview = Instantiate(selectedDecorationPrefab, mousePos, Quaternion.identity);
+            SpriteRenderer sr = activeDecorationPreview.GetComponent<SpriteRenderer>();
+            if (sr != null)
+            {
+                sr.color = new Color(sr.color.r, sr.color.g, sr.color.b, 0.5f);
+            }
+
+            isPlacingDecoration = true;
+        }
+    }
+
+    void HandleDecorationPlacement()
+    {
         Vector3 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
         mousePos.z = 0f;
 
-        // 2. Make the ghost preview follow the mouse smoothly
-        if (activePlantPreview != null)
+        if (activeDecorationPreview != null)
         {
-            activePlantPreview.transform.position = mousePos;
+            activeDecorationPreview.transform.position = mousePos;
         }
 
-        // 3. Right-click or Escape cancels placement mode
         if (Input.GetMouseButtonDown(1) || Input.GetKeyDown(KeyCode.Escape))
         {
-            Destroy(activePlantPreview);
-            isPlacingPlant = false;
-            Debug.Log("Plant placement canceled.");
+            Destroy(activeDecorationPreview);
+            isPlacingDecoration = false;
+            selectedDecorationPrefab = null;
             return;
         }
 
-        // 4. Left-click places the plant permanently
         if (Input.GetMouseButtonDown(0))
         {
-            // Block placing if player accidentally clicks down in the UI shop panel area
-            //if (Input.mousePosition.y < 150) return;
-
-            // Finalize placement: Deduct cash
-            totalMoney -= 50;
+            totalMoney -= selectedDecorationCost;
             UpdateMoneyUI();
 
-            // Turn the preview object into a fully physical plant item by resetting its opacity
-            SpriteRenderer sr = activePlantPreview.GetComponent<SpriteRenderer>();
+            SpriteRenderer sr = activeDecorationPreview.GetComponent<SpriteRenderer>();
             if (sr != null)
             {
-                sr.color = new Color(sr.color.r, sr.color.g, sr.color.b, 1.0f); // Make fully solid
+                sr.color = new Color(sr.color.r, sr.color.g, sr.color.b, 1.0f);
             }
 
-            // Let go of the reference so it stays right there in the scene permanently
-            activePlantPreview = null;
-            isPlacingPlant = false;
-            Debug.Log("Plant placed successfully!");
+            activeDecorationPreview = null;
+            isPlacingDecoration = false;
+            selectedDecorationPrefab = null;
         }
     }
 
@@ -147,33 +182,10 @@ public class AquariumManager : MonoBehaviour
         }
     }
 
-    // --- MODIFIED DECORATION FUNCTION ---
-    public void BuyDecoration()
+    public void DeductPlantedCash(int amount)
     {
-        // Check if player has cash AND isn't already holding a plant
-        if (totalMoney >= 50 && plantPrefab != null && !isPlacingPlant)
-        {
-            Vector3 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
-            mousePos.z = 0f;
-
-            // Spawn a temporary instance to act as our cursor ghost
-            activePlantPreview = Instantiate(plantPrefab, mousePos, Quaternion.identity);
-            
-            // Give the preview a translucent "ghostly" look (50% see-through)
-            SpriteRenderer sr = activePlantPreview.GetComponent<SpriteRenderer>();
-            if (sr != null)
-            {
-                sr.color = new Color(sr.color.r, sr.color.g, sr.color.b, 0.5f);
-            }
-
-            isPlacingPlant = true;
-        }
+        totalMoney -= amount;
+        if (totalMoney < 0) totalMoney = 0; 
+        UpdateMoneyUI(); 
     }
-    // Call this to penalize the player when a fish starves
-public void DeductPlantedCash(int amount)
-{
-    totalMoney -= amount;
-    if (totalMoney < 0) totalMoney = 0; // Prevent debt!
-    UpdateMoneyUI(); // Refresh numbers on screen instantly
-}
 }

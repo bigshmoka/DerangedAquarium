@@ -16,11 +16,10 @@ public class NaturalFishAI : MonoBehaviour
     private float currentHunger = 0f;
     private bool isDead = false;
 
-    // --- NEW GROWTH SETTINGS ---
     [Header("Growth Settings")]
-    public float startingScale = 0.5f;     // Baby fish start at half size
-    public float maxScale = 1.5f;          // Grown adult fish limit
-    public float growthPerBite = 0.1f;     // Grow by 10% each time they eat
+    public float startingScale = 0.5f;     
+    public float maxScale = 1.5f;          
+    public float growthPerBite = 0.1f;     
     private float currentScaleModifier;
 
     private Color originalColor;
@@ -38,7 +37,6 @@ public class NaturalFishAI : MonoBehaviour
         spriteRenderer = GetComponent<SpriteRenderer>();
         transform.rotation = Quaternion.identity;
 
-        // Set the initial baby scale at birth
         currentScaleModifier = startingScale;
         UpdateFishScale();
 
@@ -143,9 +141,7 @@ public class NaturalFishAI : MonoBehaviour
                 isChasingFood = false;
                 currentHunger = 0f; 
 
-                // --- TRIGGER GROWTH MECHANIC ---
                 GrowFish();
-
                 PickNewDestination(); 
             }
         }
@@ -155,23 +151,20 @@ public class NaturalFishAI : MonoBehaviour
         }
     }
 
-void HandleVisualFacing()
+    void HandleVisualFacing()
     {
         if (spriteRenderer == null) return;
 
         if (targetDestination.x > transform.position.x)
         {
-            // Facing right: keep localScale X positive
             transform.localScale = new Vector3(Mathf.Abs(transform.localScale.x), transform.localScale.y, transform.localScale.z);
         }
         else if (targetDestination.x < transform.position.x)
         {
-            // Facing left: invert localScale X to flip the sprite cleanly
             transform.localScale = new Vector3(-Mathf.Abs(transform.localScale.x), transform.localScale.y, transform.localScale.z);
         }
     }
 
-    // --- GROWTH FUNCTIONS (Re-added) ---
     void GrowFish()
     {
         currentScaleModifier += growthPerBite;
@@ -181,7 +174,6 @@ void HandleVisualFacing()
         }
 
         UpdateFishScale();
-        Debug.Log($"Fish ate and grew! Current scale: {currentScaleModifier}");
     }
 
     void UpdateFishScale()
@@ -197,7 +189,6 @@ void HandleVisualFacing()
         );
     }
 
-    // --- NAVIGATION FUNCTION ---
     void PickNewDestination()
     {
         float targetX = Random.Range(minBounds.x, maxBounds.x);
@@ -205,7 +196,6 @@ void HandleVisualFacing()
         targetDestination = new Vector3(targetX, targetY, 0f);
     }
 
-    // --- SURVIVAL FUNCTIONS ---
     void Die()
     {
         isDead = true;
@@ -247,4 +237,4 @@ void HandleVisualFacing()
         Gizmos.DrawLine(botR, botL);
         Gizmos.DrawLine(botL, topL);
     }
-} // <-- Closes the whole class perfectly!
+}
