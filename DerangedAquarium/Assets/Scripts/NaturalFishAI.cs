@@ -2,6 +2,12 @@ using UnityEngine;
 
 public class NaturalFishAI : MonoBehaviour
 {
+    // --- NEW: CONFIGURABLE FISH TYPES ---
+    public enum FishType { Goldfish, Tetra, Angelfish, Shark }
+
+    [Header("Species Settings")]
+    public FishType species = FishType.Goldfish; // Shows as a clean dropdown menu in the Unity Inspector
+
     [Header("Movement Tweaks")]
     public float swimSpeed = 1.2f;
     public float rushSpeedMultiplier = 1.5f; 
@@ -21,6 +27,9 @@ public class NaturalFishAI : MonoBehaviour
     public float maxScale = 1.5f;          
     public float growthPerBite = 0.1f;     
     private float currentScaleModifier;
+
+    [Header("Poop Economy")]
+    public GameObject moneyDropPrefab; 
 
     private Color originalColor;
     private Color sickColor = new Color(0.8f, 0.8f, 0.3f, 1.0f); 
@@ -142,6 +151,10 @@ public class NaturalFishAI : MonoBehaviour
                 currentHunger = 0f; 
 
                 GrowFish();
+                
+                // --- SPAWN THE SPECIES-SPECIFIC REWARD ---
+                SpawnMoneyReward();
+
                 PickNewDestination(); 
             }
         }
@@ -189,6 +202,41 @@ public class NaturalFishAI : MonoBehaviour
         );
     }
 
+    // --- UPDATED: CALCULATE PAYOUT STRICTLY BY SPECIES TYPE ---
+    void SpawnMoneyReward()
+    {
+        if (moneyDropPrefab != null)
+        {
+            int calculatedPayout = 5; // Default safety fallback value
+
+            // Read the dropdown selection and match it to a firm economy pricing matrix
+            switch (species)
+            {
+                case FishType.Goldfish:
+                    calculatedPayout = 15;
+                    break;
+                case FishType.Tetra:
+                    calculatedPayout = 8;
+                    break;
+                case FishType.Angelfish:
+                    calculatedPayout = 45;
+                    break;
+                case FishType.Shark:
+                    calculatedPayout = 120;
+                    break;
+            }
+
+            // Instantiate the item asset template
+            GameObject groundCoin = Instantiate(moneyDropPrefab, transform.position, Quaternion.identity);
+            
+            MoneyDropItem coinScript = groundCoin.GetComponent<MoneyDropItem>();
+            if (coinScript != null)
+            {
+                coinScript.cashValue = calculatedPayout;
+            }
+        }
+    }
+
     void PickNewDestination()
     {
         float targetX = Random.Range(minBounds.x, maxBounds.x);
@@ -222,19 +270,5 @@ public class NaturalFishAI : MonoBehaviour
         {
             transform.Translate(Vector3.down * 0.8f * Time.deltaTime, Space.Self); 
         }
-    }
-
-    private void OnDrawGizmosSelected()
-    {
-        Gizmos.color = Color.green;
-        Vector3 topL = new Vector3(minBounds.x, maxBounds.y, 0);
-        Vector3 topR = new Vector3(maxBounds.x, maxBounds.y, 0);
-        Vector3 botL = new Vector3(minBounds.x, minBounds.y, 0);
-        Vector3 botR = new Vector3(maxBounds.x, minBounds.y, 0);
-
-        Gizmos.DrawLine(topL, topR);
-        Gizmos.DrawLine(topR, botR);
-        Gizmos.DrawLine(botR, botL);
-        Gizmos.DrawLine(botL, topL);
     }
 }

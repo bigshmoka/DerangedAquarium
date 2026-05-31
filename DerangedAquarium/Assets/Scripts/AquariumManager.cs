@@ -10,12 +10,16 @@ public class AquariumManager : MonoBehaviour
 
     [Header("Economy Settings")]
     public int totalMoney = 100;
-    public float incomeInterval = 3f; 
-    private float incomeTimer;
 
-    [Header("UI Windows")]
+    [Header("UI Windows & Tools")]
     public TMP_Text moneyText; 
     public GameObject shopMenuWindow; 
+    
+    // --- NEW FEEDING TOOL VARIABLES ---
+    [Header("Feeding Tool Settings")]
+    public Button feedToolButton;       // Drag your FeedToolButton here
+    public TMP_Text feedToolText;       // Drag the TextMeshPro text component of that button here
+    private bool isFeedToolActive = false;
 
     // --- PLACEMENT VARIABLES ---
     private GameObject activeDecorationPreview;
@@ -26,6 +30,7 @@ public class AquariumManager : MonoBehaviour
     void Start()
     {
         UpdateMoneyUI(); 
+        UpdateFeedButtonUI(); // Set initial button appearance
 
         if (shopMenuWindow != null)
         {
@@ -42,8 +47,6 @@ public class AquariumManager : MonoBehaviour
 
     void Update()
     {
-        HandlePassiveIncome();
-        
         if (isPlacingDecoration)
         {
             HandleDecorationPlacement();
@@ -54,37 +57,56 @@ public class AquariumManager : MonoBehaviour
         }
     }
 
-    void HandlePassiveIncome()
+    void HandleMouseClicks()
     {
-        incomeTimer += Time.deltaTime;
-        if (incomeTimer >= incomeInterval)
+        // Left click detected
+        if (Input.GetMouseButtonDown(0))
         {
-            NaturalFishAI[] allFish = FindObjectsByType<NaturalFishAI>(FindObjectsSortMode.None);
-            int earned = allFish.Length * 5;
-            totalMoney += earned;
+            // Block clicks if clicking inside an open shop menu panel
+            if (shopMenuWindow != null && shopMenuWindow.activeSelf) return;
+            
+            // Block food drops if clicking low on the screen where the bottom UI bar sits
+            if (Input.mousePosition.y < 120) return;
 
-            if (earned > 0)
+            // --- CRITICAL CHECK: ONLY DROP FOOD IF THE TOOL IS TOGGLED ON ---
+            if (isFeedToolActive)
             {
-                UpdateMoneyUI(); 
-            }
+                Vector3 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+                mousePos.z = 0f; 
 
-            incomeTimer = 0f; 
+                if (foodPrefab != null)
+                {
+                    Instantiate(foodPrefab, mousePos, Quaternion.identity);
+                }
+            }
         }
     }
 
-    void HandleMouseClicks()
+    // --- NEW: TOGGLE FUNCTION CALLED BY THE BUTTON ---
+    public void ToggleFeedingTool()
     {
-        if (Input.GetMouseButtonDown(0))
+        // Flip the true/false switch
+        isFeedToolActive = !isFeedToolActive;
+        
+        // Refresh the button's text and color to reflect the state change
+        UpdateFeedButtonUI();
+    }
+
+    void UpdateFeedButtonUI()
+    {
+        if (feedToolText != null && feedToolButton != null)
         {
-            // Block spawning food if clicking inside an open menu pane
-            if (shopMenuWindow != null && shopMenuWindow.activeSelf) return;
-
-            Vector3 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
-            mousePos.z = 0f; 
-
-            if (foodPrefab != null)
+            if (isFeedToolActive)
             {
-                Instantiate(foodPrefab, mousePos, Quaternion.identity);
+                feedToolText.text = "Feed: ON";
+                // Change the button image color to a highlighted green when active
+                feedToolButton.GetComponent<Image>().color = new Color(0.2f, 0.8f, 0.2f, 1.0f);
+            }
+            else
+            {
+                feedToolText.text = "Feed: OFF";
+                // Change the button image color back to a dull neutral gray when inactive
+                feedToolButton.GetComponent<Image>().color = new Color(0.5f, 0.5f, 0.5f, 1.0f);
             }
         }
     }
@@ -105,7 +127,6 @@ public class AquariumManager : MonoBehaviour
         }
     }
 
-    // Universal purchase function called by TMP grid item slots
     public void SelectDecorationFromShop(GameObject decorationPrefab, int cost)
     {
         if (totalMoney >= cost && decorationPrefab != null && !isPlacingDecoration)
@@ -114,6 +135,10 @@ public class AquariumManager : MonoBehaviour
             selectedDecorationCost = cost;
 
             CloseShopMenu();
+
+            // Force feeding tool OFF when buying a decoration so they don't fight for inputs
+            isFeedToolActive = false;
+            UpdateFeedButtonUI();
 
             Vector3 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
             mousePos.z = 0f;
