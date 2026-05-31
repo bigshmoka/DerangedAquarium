@@ -2,24 +2,30 @@ using UnityEngine;
 
 public class ShopItemButton : MonoBehaviour
 {
+    public enum ItemType { Decoration, Fish }
+
+    [Header("Type Assignment")]
+    public ItemType itemCategory = ItemType.Decoration;
+
     [Header("Item Settings")]
-    public GameObject decorationPrefab;
+    public GameObject itemPrefab;
     public int itemCost = 50;
 
-    // This function has 0 parameters, so it WILL show up perfectly in Unity's UI dropdown menu!
     public void BuyThisItem()
     {
-        // Find our manager in the scene
         AquariumManager manager = FindFirstObjectByType<AquariumManager>();
         
         if (manager != null)
         {
-            // Pass the information safely over to our core placement loop
-            manager.SelectDecorationFromShop(decorationPrefab, itemCost);
-        }
-        else
-        {
-            Debug.LogError("Could not find the AquariumManager in the scene!");
+            // If it's a fish, bypass cursor drag placement and spawn it right in the water!
+            if (itemCategory == ItemType.Fish)
+            {
+                manager.BuyFishFromShop(itemPrefab, itemCost);
+            }
+            else // Otherwise, run our standard mouse-placement ghost loop
+            {
+                manager.SelectDecorationFromShop(itemPrefab, itemCost);
+            }
         }
     }
 }

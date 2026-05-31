@@ -213,4 +213,20 @@ public class AquariumManager : MonoBehaviour
         if (totalMoney < 0) totalMoney = 0; 
         UpdateMoneyUI(); 
     }
+    // Universal fish purchase function called by Fish Grid TMP buttons
+public void BuyFishFromShop(GameObject fishPrefab, int cost)
+{
+    if (totalMoney >= cost && fishPrefab != null)
+    {
+        // Deduct the cash amount immediately
+        totalMoney -= cost;
+        UpdateMoneyUI();
+
+        // Spawn the swimming fish right in the middle of the tank!
+        Instantiate(fishPrefab, Vector3.zero, Quaternion.identity);
+
+        // Close the shop window so they can see their brand new pet spawn
+        CloseShopMenu();
+    }
+}
 }
