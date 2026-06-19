@@ -14,8 +14,8 @@ public class AquariumManager : MonoBehaviour
     [Header("UI Windows & Tools")]
     public TMP_Text moneyText; 
     public GameObject shopMenuWindow; 
+    public TMP_Text errorNotificationText; // Drag your NotificationText UI object here
     
-    // --- NEW FEEDING TOOL VARIABLES ---
     [Header("Feeding Tool Settings")]
     public Button feedToolButton;       // Drag your FeedToolButton here
     public TMP_Text feedToolText;       // Drag the TextMeshPro text component of that button here
@@ -37,6 +37,13 @@ public class AquariumManager : MonoBehaviour
             shopMenuWindow.SetActive(false);
         }
 
+        // Deactivate error notification text at start
+        if (errorNotificationText != null)
+        {
+            errorNotificationText.gameObject.SetActive(false);
+        }
+
+        // Spawn initial starting fish
         if (fishPrefab != null)
         {
             Instantiate(fishPrefab, new Vector3(-2f, 0f, 0f), Quaternion.identity);
@@ -68,6 +75,14 @@ public class AquariumManager : MonoBehaviour
             // Block food drops if clicking low on the screen where the bottom UI bar sits
             if (Input.mousePosition.y < 120) return;
 
+            // --- SCREEN BOUNDARY SAFETY CHECK (1920x1080) ---
+            // If the mouse wanders outside the active game window layout, ignore the click entirely!
+            if (Input.mousePosition.x < 0 || Input.mousePosition.x > 1920 ||
+                Input.mousePosition.y < 0 || Input.mousePosition.y > 1080)
+            {
+                return; 
+            }
+
             // --- CRITICAL CHECK: ONLY DROP FOOD IF THE TOOL IS TOGGLED ON ---
             if (isFeedToolActive)
             {
@@ -82,13 +97,10 @@ public class AquariumManager : MonoBehaviour
         }
     }
 
-    // --- NEW: TOGGLE FUNCTION CALLED BY THE BUTTON ---
+    // --- TOGGLE FUNCTION CALLED BY THE FEED BUTTON ---
     public void ToggleFeedingTool()
     {
-        // Flip the true/false switch
         isFeedToolActive = !isFeedToolActive;
-        
-        // Refresh the button's text and color to reflect the state change
         UpdateFeedButtonUI();
     }
 
@@ -99,14 +111,12 @@ public class AquariumManager : MonoBehaviour
             if (isFeedToolActive)
             {
                 feedToolText.text = "Feed: ON";
-                // Change the button image color to a highlighted green when active
-                feedToolButton.GetComponent<Image>().color = new Color(0.2f, 0.8f, 0.2f, 1.0f);
+                feedToolButton.GetComponent<Image>().color = new Color(0.2f, 0.8f, 0.2f, 1.0f); // Vibrant Green
             }
             else
             {
                 feedToolText.text = "Feed: OFF";
-                // Change the button image color back to a dull neutral gray when inactive
-                feedToolButton.GetComponent<Image>().color = new Color(0.5f, 0.5f, 0.5f, 1.0f);
+                feedToolButton.GetComponent<Image>().color = new Color(0.5f, 0.5f, 0.5f, 1.0f); // Neutral Gray
             }
         }
     }
@@ -127,6 +137,21 @@ public class AquariumManager : MonoBehaviour
         }
     }
 
+    // Universal fish purchase function called by Fish Grid buttons
+    public void BuyFishFromShop(GameObject fishPrefab, int cost)
+    {
+        if (totalMoney >= cost && fishPrefab != null)
+        {
+            totalMoney -= cost;
+            UpdateMoneyUI();
+
+            // Spawn the fish right in the open water!
+            Instantiate(fishPrefab, Vector3.zero, Quaternion.identity);
+
+            CloseShopMenu();
+        }
+    }
+
     public void SelectDecorationFromShop(GameObject decorationPrefab, int cost)
     {
         if (totalMoney >= cost && decorationPrefab != null && !isPlacingDecoration)
@@ -136,7 +161,7 @@ public class AquariumManager : MonoBehaviour
 
             CloseShopMenu();
 
-            // Force feeding tool OFF when buying a decoration so they don't fight for inputs
+            // Force feeding tool OFF when buying a decoration so inputs don't fight
             isFeedToolActive = false;
             UpdateFeedButtonUI();
 
@@ -147,7 +172,7 @@ public class AquariumManager : MonoBehaviour
             SpriteRenderer sr = activeDecorationPreview.GetComponent<SpriteRenderer>();
             if (sr != null)
             {
-                sr.color = new Color(sr.color.r, sr.color.g, sr.color.b, 0.5f);
+                sr.color = new Color(sr.color.r, sr.color.g, sr.color.b, 0.5f); // Transparent preview ghost
             }
 
             isPlacingDecoration = true;
@@ -164,6 +189,7 @@ public class AquariumManager : MonoBehaviour
             activeDecorationPreview.transform.position = mousePos;
         }
 
+        // Cancel placement on Right-Click or Escape
         if (Input.GetMouseButtonDown(1) || Input.GetKeyDown(KeyCode.Escape))
         {
             Destroy(activeDecorationPreview);
@@ -172,6 +198,7 @@ public class AquariumManager : MonoBehaviour
             return;
         }
 
+        // Confirm placement on Left-Click
         if (Input.GetMouseButtonDown(0))
         {
             totalMoney -= selectedDecorationCost;
@@ -180,12 +207,36 @@ public class AquariumManager : MonoBehaviour
             SpriteRenderer sr = activeDecorationPreview.GetComponent<SpriteRenderer>();
             if (sr != null)
             {
-                sr.color = new Color(sr.color.r, sr.color.g, sr.color.b, 1.0f);
+                sr.color = new Color(sr.color.r, sr.color.g, sr.color.b, 1.0f); // Make solid
             }
 
             activeDecorationPreview = null;
             isPlacingDecoration = false;
             selectedDecorationPrefab = null;
+        }
+    }
+
+    // --- VISUAL NOTIFICATION ALERTS ---
+    public void TriggerNotificationAlert(string message)
+    {
+        if (errorNotificationText != null)
+        {
+            errorNotificationText.text = message;
+            errorNotificationText.gameObject.SetActive(true);
+
+            // Clear any lingering hide requests so spam-clicking doesn't cause overlapping glitches
+            CancelInvoke(nameof(HideNotificationAlert));
+
+            // Auto-hide the text pop-up after 2.5 seconds
+            Invoke(nameof(HideNotificationAlert), 2.5f);
+        }
+    }
+
+    void HideNotificationAlert()
+    {
+        if (errorNotificationText != null)
+        {
+            errorNotificationText.gameObject.SetActive(false);
         }
     }
 
@@ -197,36 +248,10 @@ public class AquariumManager : MonoBehaviour
         }
     }
 
-    public void BuyNewFish()
-    {
-        if (totalMoney >= 30 && fishPrefab != null)
-        {
-            totalMoney -= 30;
-            UpdateMoneyUI(); 
-            Instantiate(fishPrefab, Vector3.zero, Quaternion.identity);
-        }
-    }
-
     public void DeductPlantedCash(int amount)
     {
         totalMoney -= amount;
         if (totalMoney < 0) totalMoney = 0; 
         UpdateMoneyUI(); 
     }
-    // Universal fish purchase function called by Fish Grid TMP buttons
-public void BuyFishFromShop(GameObject fishPrefab, int cost)
-{
-    if (totalMoney >= cost && fishPrefab != null)
-    {
-        // Deduct the cash amount immediately
-        totalMoney -= cost;
-        UpdateMoneyUI();
-
-        // Spawn the swimming fish right in the middle of the tank!
-        Instantiate(fishPrefab, Vector3.zero, Quaternion.identity);
-
-        // Close the shop window so they can see their brand new pet spawn
-        CloseShopMenu();
-    }
-}
 }

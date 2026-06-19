@@ -13,16 +13,32 @@ public class ShopItemButton : MonoBehaviour
 
     public void BuyThisItem()
     {
+        // Locates the master manager in the current scene
         AquariumManager manager = FindFirstObjectByType<AquariumManager>();
         
         if (manager != null)
         {
-            // If it's a fish, bypass cursor drag placement and spawn it right in the water!
+            // If it belongs to the Fish/Creature category, run population checks
             if (itemCategory == ItemType.Fish)
             {
+                // Unique Snail population limiter
+                if (itemPrefab != null && itemPrefab.name.Contains("Snail"))
+                {
+                    // Scan the tank to see if a snail already exists
+                    SnailAI existingSnail = FindFirstObjectByType<SnailAI>();
+                    
+                    if (existingSnail != null)
+                    {
+                        // Fire off the screen alert on our manager UI and block the purchase
+                        manager.TriggerNotificationAlert("Snail Limit Reached!");
+                        return; 
+                    }
+                }
+
+                // If the check passes (or it's just a normal fish), spawn it!
                 manager.BuyFishFromShop(itemPrefab, itemCost);
             }
-            else // Otherwise, run our standard mouse-placement ghost loop
+            else // Run standard mouse-placement loop for decorations
             {
                 manager.SelectDecorationFromShop(itemPrefab, itemCost);
             }
