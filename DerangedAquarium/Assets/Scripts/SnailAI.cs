@@ -9,6 +9,7 @@ public class SnailAI : MonoBehaviour
     [Header("Cleaning Settings")]
     public float cleaningPower = 0.15f; // How much algae it cleans per second
     public float eatInterval = 0.5f;    // Time between bites
+    public int coinsPerSwipe = 5;       // --- NEW: Custom reward amount per swipe!
 
     [Header("Pop Off Customization")]
     [Range(0, 100)] 
@@ -27,6 +28,9 @@ public class SnailAI : MonoBehaviour
     private AlgaeNode currentTargetNode;
     private Vector3 targetPosition;
     private float eatTimer = 0f;
+
+    // --- NEW: ECONOMY TRACKING ---
+    private AquariumManager aquariumManager;
 
     // --- STRETCH PREVENTION ---
     private Vector3 originalScale;
@@ -55,6 +59,10 @@ public class SnailAI : MonoBehaviour
         transform.position = new Vector3(transform.position.x, floorY, transform.position.z);
 
         algaeManager = FindFirstObjectByType<AlgaeManager>();
+        
+        // --- NEW: Link directly to the aquarium manager system ---
+        aquariumManager = FindFirstObjectByType<AquariumManager>();
+
         PickRandomFloorTarget();
     }
 
@@ -147,11 +155,9 @@ public class SnailAI : MonoBehaviour
             }
         }
 
-        // Pass false & clean up direction input
         HandleSnailOrientation(moveDirection, false, 0f);
     }
 
-    // --- UPGRADED: SMOOTH INTERPOLATION ENTRY + WAVE VELOCITY FLIPPING ---
     void StartCleaning()
     {
         hasWayPoint = false; 
@@ -162,6 +168,15 @@ public class SnailAI : MonoBehaviour
             if (currentTargetNode != null)
             {
                 currentTargetNode.CleanAlgae(cleaningPower * eatInterval);
+
+                // --- NEW: DIRECT WALLET INJECTION LOOP ---
+                if (aquariumManager != null)
+                {
+                    aquariumManager.totalMoney += coinsPerSwipe;
+                    
+                    // Directly run the helper function from your manager script to update the text mesh layout instantly
+                    aquariumManager.Invoke("UpdateMoneyUI", 0f); 
+                }
             }
             eatTimer = 0f;
         }
@@ -170,11 +185,7 @@ public class SnailAI : MonoBehaviour
         {
             Vector3 targetNodePos = currentTargetNode.transform.position;
             
-            // Generate the wave offset
             float waveOffset = Mathf.Sin(Time.time * scrapingSpeed) * scrapingDistance;
-            
-            // Math trick: Using the Cosine wave tells us the EXACT movement direction (velocity) of the sine wave!
-            // Positive value = moving Right/Up, Negative value = moving Left/Down
             float waveDirectionVelocity = Mathf.Cos(Time.time * scrapingSpeed);
 
             bool isOnFloor = Mathf.Abs(targetNodePos.y - floorY) < 0.5f;
@@ -182,24 +193,14 @@ public class SnailAI : MonoBehaviour
 
             if (isOnFloor)
             {
-                // FLOOR: Calculate target coordinate along the base line
                 calculatedScrapePosition = new Vector3(targetNodePos.x + waveOffset, floorY, transform.position.z);
-                
-                // Move towards it smoothly instead of hard snapping
                 transform.position = Vector3.MoveTowards(transform.position, calculatedScrapePosition, crawlSpeed * Time.deltaTime);
-                
-                // Pass velocity direction so it faces the way it is sliding horizontally
                 HandleSnailOrientation(Vector3.right, true, waveDirectionVelocity);
             }
             else
             {
-                // GLASS WALLS: Calculate target coordinate along the glass pane
                 calculatedScrapePosition = new Vector3(transform.position.x, targetNodePos.y + waveOffset, transform.position.z);
-                
-                // Move towards it smoothly instead of hard snapping
                 transform.position = Vector3.MoveTowards(transform.position, calculatedScrapePosition, crawlSpeed * Time.deltaTime);
-                
-                // Pass velocity direction so it faces the way it is sliding vertically
                 HandleSnailOrientation(Vector3.up, true, waveDirectionVelocity);
             }
         }
@@ -286,7 +287,6 @@ public class SnailAI : MonoBehaviour
         targetPosition = new Vector3(randomX, floorY, 0f);
     }
 
-    // --- UPGRADED DIRECTION MATRIX: SUPPORTS VELOCITY FLIPPING ---
     void HandleSnailOrientation(Vector3 direction, bool isEating, float waveVelocity)
     {
         if (Mathf.Abs(direction.y) > 0.7f)
@@ -296,7 +296,6 @@ public class SnailAI : MonoBehaviour
                 // --- RIGHT WALL ---
                 if (isEating)
                 {
-                    // Flip up and down dynamically depending on wave velocity direction
                     float lookDirection = (waveVelocity >= 0f) ? 1f : -1f;
                     transform.localScale = new Vector3(lookDirection * Mathf.Abs(originalScale.x), originalScale.y, originalScale.z);
                     transform.rotation = Quaternion.Euler(0f, 0f, 90f);
@@ -321,7 +320,6 @@ public class SnailAI : MonoBehaviour
                 // --- LEFT WALL ---
                 if (isEating)
                 {
-                    // Flip up and down dynamically depending on wave velocity direction (inverted matrix for left wall)
                     float lookDirection = (waveVelocity >= 0f) ? -1f : 1f;
                     transform.localScale = new Vector3(lookDirection * Mathf.Abs(originalScale.x), originalScale.y, originalScale.z);
                     transform.rotation = Quaternion.Euler(0f, 0f, -90f);
@@ -349,7 +347,6 @@ public class SnailAI : MonoBehaviour
 
         if (isEating)
         {
-            // Flip left and right dynamically depending on wave velocity direction
             float lookDirection = (waveVelocity >= 0f) ? 1f : -1f;
             transform.localScale = new Vector3(lookDirection * Mathf.Abs(originalScale.x), originalScale.y, originalScale.z);
             return;
