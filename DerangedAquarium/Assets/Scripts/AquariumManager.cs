@@ -22,8 +22,8 @@ public class AquariumManager : MonoBehaviour
     private bool isFeedToolActive = false;
 
     [Header("Sponge Tool Settings")]
-    public Button spongeToolButton;     // Drag your SpongeToolButton here
-    public TMP_Text spongeToolText;     // Drag the Sponge Button's TMP text component here
+    public Button spongeToolButton;     
+    public TMP_Text spongeToolText;     
     private bool isSpongeToolActive = false;
 
     private GameObject activeDecorationPreview;
@@ -35,17 +35,17 @@ public class AquariumManager : MonoBehaviour
     {
         UpdateMoneyUI(); 
         UpdateFeedButtonUI(); 
-        UpdateSpongeButtonUI(); // Set initial sponge appearance
+        UpdateSpongeButtonUI(); 
 
         if (shopMenuWindow != null) shopMenuWindow.SetActive(false);
         if (errorNotificationText != null) errorNotificationText.gameObject.SetActive(false);
 
-        // Spawn initial starting fish
+        // Spawn initial starting fish at a perfect, uniform baby scale (e.g., 0.4f)
         if (fishPrefab != null)
         {
-            Instantiate(fishPrefab, new Vector3(-2f, 0f, 0f), Quaternion.identity);
-            Instantiate(fishPrefab, new Vector3(0f, 2f, 0f), Quaternion.identity);
-            Instantiate(fishPrefab, new Vector3(2f, -1f, 0f), Quaternion.identity);
+            SpawnBabyFish(fishPrefab, new Vector3(-2f, 0f, 0f));
+            SpawnBabyFish(fishPrefab, new Vector3(0f, 2f, 0f));
+            SpawnBabyFish(fishPrefab, new Vector3(2f, -1f, 0f));
         }
     }
 
@@ -75,7 +75,6 @@ public class AquariumManager : MonoBehaviour
                 return; 
             }
 
-            // ONLY DROP FOOD IF FEED TOOL IS ACTIVE (and not doing sponge work)
             if (isFeedToolActive && !isSpongeToolActive)
             {
                 Vector3 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
@@ -89,15 +88,20 @@ public class AquariumManager : MonoBehaviour
         }
     }
 
-    // --- TOOL INTERCHANGE LOGIC ---
+    // Helper function to ensure newly spawned fish are uniform and small
+    void SpawnBabyFish(GameObject prefab, Vector3 position)
+    {
+        GameObject newFish = Instantiate(prefab, position, Quaternion.identity);
+        
+        // STRETCH PREVENTION: Force X and Y to be the exact same starting size (40% of standard size)
+        float babyScale = 0.4f;
+        newFish.transform.localScale = new Vector3(babyScale, babyScale, 1f);
+    }
 
     public void ToggleFeedingTool()
     {
         isFeedToolActive = !isFeedToolActive;
-        
-        // If we turn feeding ON, force sponge OFF
         if (isFeedToolActive) isSpongeToolActive = false;
-
         UpdateFeedButtonUI();
         UpdateSpongeButtonUI();
     }
@@ -105,15 +109,11 @@ public class AquariumManager : MonoBehaviour
     public void ToggleSpongeTool()
     {
         isSpongeToolActive = !isSpongeToolActive;
-
-        // If we turn sponge ON, force feeding OFF
         if (isSpongeToolActive) isFeedToolActive = false;
-
         UpdateFeedButtonUI();
         UpdateSpongeButtonUI();
     }
 
-    // Public getter so AlgaeNodes can verify if the sponge is equipped
     public bool IsSpongeToolActive()
     {
         return isSpongeToolActive;
@@ -126,12 +126,12 @@ public class AquariumManager : MonoBehaviour
             if (isFeedToolActive)
             {
                 feedToolText.text = "Feed: ON";
-                feedToolButton.GetComponent<Image>().color = new Color(0.2f, 0.8f, 0.2f, 1.0f); // Green
+                feedToolButton.GetComponent<Image>().color = new Color(0.2f, 0.8f, 0.2f, 1.0f);
             }
             else
             {
                 feedToolText.text = "Feed: OFF";
-                feedToolButton.GetComponent<Image>().color = new Color(0.5f, 0.5f, 0.5f, 1.0f); // Gray
+                feedToolButton.GetComponent<Image>().color = new Color(0.5f, 0.5f, 0.5f, 1.0f);
             }
         }
     }
@@ -143,17 +143,15 @@ public class AquariumManager : MonoBehaviour
             if (isSpongeToolActive)
             {
                 spongeToolText.text = "Sponge: ON";
-                spongeToolButton.GetComponent<Image>().color = new Color(0.2f, 0.6f, 0.9f, 1.0f); // Vibrant Blue
+                spongeToolButton.GetComponent<Image>().color = new Color(0.2f, 0.6f, 0.9f, 1.0f);
             }
             else
             {
                 spongeToolText.text = "Sponge: OFF";
-                spongeToolButton.GetComponent<Image>().color = new Color(0.5f, 0.5f, 0.5f, 1.0f); // Gray
+                spongeToolButton.GetComponent<Image>().color = new Color(0.5f, 0.5f, 0.5f, 1.0f);
             }
         }
     }
-
-    // --- PRE-EXISTING SYSTEMS ---
 
     public void OpenShopMenu() { if (shopMenuWindow != null) shopMenuWindow.SetActive(true); }
     public void CloseShopMenu() { if (shopMenuWindow != null) shopMenuWindow.SetActive(false); }
@@ -164,7 +162,10 @@ public class AquariumManager : MonoBehaviour
         {
             totalMoney -= cost;
             UpdateMoneyUI();
-            Instantiate(fishPrefab, Vector3.zero, Quaternion.identity);
+            
+            // Spawn the shop fish as a perfect uniform baby right in the center!
+            SpawnBabyFish(fishPrefab, Vector3.zero);
+
             CloseShopMenu();
         }
     }

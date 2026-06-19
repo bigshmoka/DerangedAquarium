@@ -80,10 +80,10 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 1511666851
   m_SortingLayer: 2
-  m_SortingOrder: 0
+  m_SortingOrder: -1
   m_MaskInteraction: 0
-  m_Sprite: {fileID: -2413806693520163455, guid: a86470a33a6bf42c4b3595704624658b, type: 3}
-  m_Color: {r: 0.7830189, g: 0.37304202, b: 0.71275353, a: 1}
+  m_Sprite: {fileID: 3056274277443130905, guid: b4d4650901d6a1e48b088c9c4c9b0f86, type: 3}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -104,7 +104,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cf1bbc2184dce1842ae59d78752775da, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SnailAI
-  crawlSpeed: 0.5
+  crawlSpeed: 1
   floorY: -4.6
   cleaningPower: 0.15
   eatInterval: 0.5
+  popOffChancePercentage: 20
+  minPopOffDistance: 2.5
+  maxPopOffDistance: 4.5
+  popOffLaunchSpeed: 2
+  floatFallSpeed: 0.8
+  tumbleRotationSpeed: 45
+  scrapingSpeed: 3
+  scrapingDistance: 0.3

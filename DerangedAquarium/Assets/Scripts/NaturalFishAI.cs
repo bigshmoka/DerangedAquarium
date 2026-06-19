@@ -41,10 +41,17 @@ public class NaturalFishAI : MonoBehaviour
     private bool isChasingFood = false;
     private SpriteRenderer spriteRenderer;
 
+    // --- STRETCH PREVENTION VARIABLES ---
+    private Vector3 baseScale;
+    private float facingDirectionSign = 1f;
+
     void Start()
     {
         spriteRenderer = GetComponent<SpriteRenderer>();
         transform.rotation = Quaternion.identity;
+
+        // 1. Capture the exact scale proportions you assigned this fish in the inspector
+        baseScale = transform.localScale;
 
         currentScaleModifier = startingScale;
         UpdateFishScale();
@@ -164,17 +171,28 @@ public class NaturalFishAI : MonoBehaviour
         }
     }
 
+    // --- CLEANED UP: ADJUST DIRECTION TRACKING ONLY ---
     void HandleVisualFacing()
     {
         if (spriteRenderer == null) return;
 
-        if (targetDestination.x > transform.position.x)
+        bool directionChanged = false;
+
+        if (targetDestination.x > transform.position.x && facingDirectionSign != 1f)
         {
-            transform.localScale = new Vector3(Mathf.Abs(transform.localScale.x), transform.localScale.y, transform.localScale.z);
+            facingDirectionSign = 1f;
+            directionChanged = true;
         }
-        else if (targetDestination.x < transform.position.x)
+        else if (targetDestination.x < transform.position.x && facingDirectionSign != -1f)
         {
-            transform.localScale = new Vector3(-Mathf.Abs(transform.localScale.x), transform.localScale.y, transform.localScale.z);
+            facingDirectionSign = -1f;
+            directionChanged = true;
+        }
+
+        // Only recalculate the transform vector if the fish actually turns around
+        if (directionChanged)
+        {
+            UpdateFishScale();
         }
     }
 
@@ -189,16 +207,15 @@ public class NaturalFishAI : MonoBehaviour
         UpdateFishScale();
     }
 
+    // --- FIXED: STRETCH-PROOF SCALE CALCULATOR ---
     void UpdateFishScale()
     {
-        float baseWidth = 1.5f;
-        float baseHeight = 0.6f;
-        float directionSign = transform.localScale.x < 0 ? -1f : 1f;
-
+        // Instead of hardcoded numbers, we use the custom base scale values 
+        // you defined in the editor, ensuring X and Y expand perfectly together!
         transform.localScale = new Vector3(
-            baseWidth * currentScaleModifier * directionSign, 
-            baseHeight * currentScaleModifier, 
-            1f
+            baseScale.x * currentScaleModifier * facingDirectionSign, 
+            baseScale.y * currentScaleModifier, 
+            baseScale.z
         );
     }
 
@@ -207,9 +224,8 @@ public class NaturalFishAI : MonoBehaviour
     {
         if (moneyDropPrefab != null)
         {
-            int calculatedPayout = 5; // Default safety fallback value
+            int calculatedPayout = 5; 
 
-            // Read the dropdown selection and match it to a firm economy pricing matrix
             switch (species)
             {
                 case FishType.Goldfish:
@@ -226,7 +242,6 @@ public class NaturalFishAI : MonoBehaviour
                     break;
             }
 
-            // Instantiate the item asset template
             GameObject groundCoin = Instantiate(moneyDropPrefab, transform.position, Quaternion.identity);
             
             MoneyDropItem coinScript = groundCoin.GetComponent<MoneyDropItem>();

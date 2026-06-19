@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 2296025265209043532}
   - component: {fileID: 2097086145436780442}
   - component: {fileID: 9078046907069230953}
+  - component: {fileID: 3912589799245482135}
   m_Layer: 0
   m_Name: Fish
   m_TagString: Untagged
@@ -18,21 +19,25 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &2296025265209043532
-Transform:
+--- !u!224 &2296025265209043532
+RectTransform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 389567483668719346}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0.0041646776, y: -0.0041646794, z: 0.70709455, w: 0.70709455}
+  m_LocalRotation: {x: 0, y: -0.0058904006, z: 0, w: 0.99998266}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 2.1, y: 0.48735535, z: 0.46083}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: -0.675, z: 90}
+  m_LocalEulerAnglesHint: {x: 0, y: -0.675, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 1, y: 2}
+  m_Pivot: {x: 0.5, y: 0.5}
 --- !u!212 &2097086145436780442
 SpriteRenderer:
   serializedVersion: 2
@@ -82,8 +87,8 @@ SpriteRenderer:
   m_SortingLayer: 2
   m_SortingOrder: 0
   m_MaskInteraction: 0
-  m_Sprite: {fileID: -9095717837082945937, guid: 207ee8102dd4143d288186ef0be518ee, type: 3}
-  m_Color: {r: 0.8773585, g: 0.47347313, b: 0.07035423, a: 1}
+  m_Sprite: {fileID: -7870993675192550669, guid: 36f01284e1192144a9780508cff509ac, type: 3}
+  m_Color: {r: 0.8490566, g: 0.45003128, b: 0.06007475, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -107,11 +112,19 @@ MonoBehaviour:
   species: 0
   swimSpeed: 1.2
   rushSpeedMultiplier: 1.5
-  minBounds: {x: -7.5, y: -4.5}
-  maxBounds: {x: 7.5, y: 4.5}
+  minBounds: {x: -7.5, y: -3.5}
+  maxBounds: {x: 7.5, y: 3.5}
   maxHunger: 30
   hungerWarningTime: 15
   startingScale: 0.5
-  maxScale: 2
+  maxScale: 1.5
   growthPerBite: 0.1
   moneyDropPrefab: {fileID: 6860327883644993690, guid: 18dba64ec4aee7c48bf25ddc263e733f, type: 3}
+--- !u!222 &3912589799245482135
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 389567483668719346}
+  m_CullTransparentMesh: 1
