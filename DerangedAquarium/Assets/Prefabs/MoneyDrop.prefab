@@ -143,4 +143,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MoneyDropItem
   cashValue: 5
   fallSpeed: 0.5
-  floorYValue: -3.5
+  floorYValue: -4.5

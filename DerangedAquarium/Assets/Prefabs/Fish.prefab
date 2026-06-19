@@ -107,11 +107,11 @@ MonoBehaviour:
   species: 0
   swimSpeed: 1.2
   rushSpeedMultiplier: 1.5
-  minBounds: {x: -7.5, y: -3.5}
-  maxBounds: {x: 7.5, y: 3.5}
+  minBounds: {x: -7.5, y: -4.5}
+  maxBounds: {x: 7.5, y: 4.5}
   maxHunger: 30
   hungerWarningTime: 15
   startingScale: 0.5
-  maxScale: 1.5
+  maxScale: 2
   growthPerBite: 0.1
   moneyDropPrefab: {fileID: 6860327883644993690, guid: 18dba64ec4aee7c48bf25ddc263e733f, type: 3}

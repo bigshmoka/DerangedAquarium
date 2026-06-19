@@ -13,7 +13,6 @@ public class SnailAI : MonoBehaviour
     private AlgaeManager algaeManager;
     private AlgaeNode currentTargetNode;
     private Vector3 targetPosition;
-    private bool isCleaning = false;
     private float eatTimer = 0f;
 
     void Start()
@@ -30,7 +29,6 @@ public class SnailAI : MonoBehaviour
         // If we don't have a task, check if any walls are dirty
         if (currentTargetNode == null || currentTargetNode.currentAlgaeLevel <= 0.05f)
         {
-            isCleaning = false;
             currentTargetNode = algaeManager.GetDirtiestAlgaeNode();
 
             if (currentTargetNode != null)
@@ -76,7 +74,6 @@ public class SnailAI : MonoBehaviour
 
     void StartCleaning()
     {
-        isCleaning = true;
         eatTimer += Time.deltaTime;
 
         if (eatTimer >= eatInterval)

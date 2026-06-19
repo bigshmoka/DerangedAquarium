@@ -105,6 +105,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FishFood
   fallSpeed: 1
-  floorYValue: -4
+  floorYValue: -4.6
   lifeTimeAfterFloor: 5
   isTargeted: 0

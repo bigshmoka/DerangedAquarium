@@ -14,10 +14,7 @@ public class AlgaeNode : MonoBehaviour
     void Start()
     {
         spriteRenderer = GetComponent<SpriteRenderer>();
-        
-        // Give this specific wall a slightly random speed so it doesn't match the others!
         customGrowthMultiplier = Random.Range(0.7f, 1.4f);
-        
         UpdateVisuals();
     }
 
@@ -25,7 +22,6 @@ public class AlgaeNode : MonoBehaviour
     {
         if (currentAlgaeLevel < 1f)
         {
-            // Grow independently over time
             currentAlgaeLevel += (baseGrowthRate * customGrowthMultiplier) * Time.deltaTime;
             if (currentAlgaeLevel > 1f) currentAlgaeLevel = 1f;
 
@@ -33,12 +29,31 @@ public class AlgaeNode : MonoBehaviour
         }
     }
 
+    // This handles the automated cleaning from the Snail
     public void CleanAlgae(float amount)
     {
         currentAlgaeLevel -= amount;
         if (currentAlgaeLevel < 0f) currentAlgaeLevel = 0f;
 
         UpdateVisuals();
+    }
+
+    // --- NEW: NO-CLICK HOVER WIPING ---
+    // This triggers the EXACT instant the mouse cursor crosses into the wall's collider box
+    void OnMouseEnter()
+    {
+        AquariumManager manager = FindFirstObjectByType<AquariumManager>();
+        
+        // Check if the manager exists and the Sponge tool is currently toggled ON
+        if (manager != null && manager.IsSpongeToolActive())
+        {
+            // Instantly wipe away 30% of the algae just by sliding the mouse over it!
+            currentAlgaeLevel -= 0.30f;
+            if (currentAlgaeLevel < 0f) currentAlgaeLevel = 0f;
+
+            UpdateVisuals();
+            Debug.Log(gameObject.name + " scrubbed via hover! Current Algae: " + currentAlgaeLevel);
+        }
     }
 
     void UpdateVisuals()
