@@ -2,7 +2,8 @@ using UnityEngine;
 
 public class ShopItemButton : MonoBehaviour
 {
-    public enum ItemType { Decoration, Fish }
+    // --- UPDATED: Added Item to the category list ---
+    public enum ItemType { Decoration, Fish, Item }
 
     [Header("Type Assignment")]
     public ItemType itemCategory = ItemType.Decoration;
@@ -18,7 +19,7 @@ public class ShopItemButton : MonoBehaviour
         
         if (manager != null)
         {
-            // If it belongs to the Fish/Creature category, run population checks
+            // 1. Check if it belongs to the Fish/Creature category
             if (itemCategory == ItemType.Fish)
             {
                 // Unique Snail population limiter
@@ -38,7 +39,13 @@ public class ShopItemButton : MonoBehaviour
                 // If the check passes (or it's just a normal fish), spawn it!
                 manager.BuyFishFromShop(itemPrefab, itemCost);
             }
-            else // Run standard mouse-placement loop for decorations
+            // --- NEW: 2. Check if it belongs to the Item category (like the Automatic Feeder) ---
+            else if (itemCategory == ItemType.Item)
+            {
+                manager.SelectItemFromShop(itemPrefab, itemCost);
+            }
+            // 3. Run standard mouse-placement loop for decorations
+            else 
             {
                 manager.SelectDecorationFromShop(itemPrefab, itemCost);
             }

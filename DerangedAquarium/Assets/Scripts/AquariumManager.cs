@@ -10,7 +10,6 @@ public class AquariumManager : MonoBehaviour
 
     [Header("Economy Settings")]
     public int totalMoney = 100;
-    // --- NEW: Tracks if the shop is visually open to block tools safely ---
     [HideInInspector] public bool isShopOpen = false; 
 
     [Header("UI Windows & Tools")]
@@ -28,10 +27,17 @@ public class AquariumManager : MonoBehaviour
     public TMP_Text spongeToolText;     
     private bool isSpongeToolActive = false;
 
+    [Header("Placement States")]
     private GameObject activeDecorationPreview;
     private bool isPlacingDecoration = false;
     private GameObject selectedDecorationPrefab;
     private int selectedDecorationCost;
+
+    // --- NEW: Item Placement Variables ---
+    private GameObject activeItemPreview;
+    private bool isPlacingItem = false;
+    private GameObject selectedItemPrefab;
+    private int selectedItemCost;
 
     void Start()
     {
@@ -41,7 +47,6 @@ public class AquariumManager : MonoBehaviour
 
         if (errorNotificationText != null) errorNotificationText.gameObject.SetActive(false);
 
-        // Spawn initial starting fish at a perfect, uniform baby scale (e.g., 0.4f)
         if (fishPrefab != null)
         {
             SpawnBabyFish(fishPrefab, new Vector3(-2f, 0f, 0f));
@@ -56,6 +61,10 @@ public class AquariumManager : MonoBehaviour
         {
             HandleDecorationPlacement();
         }
+        else if (isPlacingItem) // Handles moving item with mouse preview
+        {
+            HandleItemPlacement();
+        }
         else
         {
             HandleMouseClicks();
@@ -66,11 +75,9 @@ public class AquariumManager : MonoBehaviour
     {
         if (Input.GetMouseButtonDown(0))
         {
-            // --- FIX: Check our state tracker instead of the UI GameObject's active status ---
             if (isShopOpen) return;
             if (Input.mousePosition.y < 120) return;
 
-            // SCREEN BOUNDARY SAFETY CHECK (1920x1080)
             if (Input.mousePosition.x < 0 || Input.mousePosition.x > 1920 ||
                 Input.mousePosition.y < 0 || Input.mousePosition.y > 1080)
             {
@@ -152,7 +159,6 @@ public class AquariumManager : MonoBehaviour
         }
     }
 
-    // --- FIX: Modernized to use state tracking flags instead of forcing active layout states ---
     public void OpenShopMenu() { isShopOpen = true; }
     public void CloseShopMenu() { isShopOpen = false; }
 
@@ -165,11 +171,15 @@ public class AquariumManager : MonoBehaviour
             SpawnBabyFish(fishPrefab, Vector3.zero);
             CloseShopMenu();
         }
+        else if (totalMoney < cost)
+        {
+            TriggerNotificationAlert("Not enough money!");
+        }
     }
 
     public void SelectDecorationFromShop(GameObject decorationPrefab, int cost)
     {
-        if (totalMoney >= cost && decorationPrefab != null && !isPlacingDecoration)
+        if (totalMoney >= cost && decorationPrefab != null && !isPlacingDecoration && !isPlacingItem)
         {
             selectedDecorationPrefab = decorationPrefab;
             selectedDecorationCost = cost;
@@ -188,6 +198,10 @@ public class AquariumManager : MonoBehaviour
             if (sr != null) sr.color = new Color(sr.color.r, sr.color.g, sr.color.b, 0.5f);
 
             isPlacingDecoration = true;
+        }
+        else if (totalMoney < cost)
+        {
+            TriggerNotificationAlert("Not enough money!");
         }
     }
 
@@ -215,6 +229,59 @@ public class AquariumManager : MonoBehaviour
             activeDecorationPreview = null;
             isPlacingDecoration = false;
             selectedDecorationPrefab = null;
+        }
+    }
+
+    // --- FIX: THIS IS THE METHOD THAT WAS MISSING ---
+    public void SelectItemFromShop(GameObject itemPrefab, int cost)
+    {
+        if (totalMoney >= cost && itemPrefab != null && !isPlacingDecoration && !isPlacingItem)
+        {
+            selectedItemPrefab = itemPrefab;
+            selectedItemCost = cost;
+            CloseShopMenu();
+
+            isFeedToolActive = false;
+            isSpongeToolActive = false;
+            UpdateFeedButtonUI();
+            UpdateSpongeButtonUI();
+
+            Vector3 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+            mousePos.z = 0f;
+
+            // Instantiates item preview at mouse location
+            activeItemPreview = Instantiate(selectedItemPrefab, mousePos, Quaternion.identity);
+            isPlacingItem = true;
+        }
+        else if (totalMoney < cost)
+        {
+            TriggerNotificationAlert("Not enough money!");
+        }
+    }
+
+    // Handles moving and confirming item placement
+    void HandleItemPlacement()
+    {
+        Vector3 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+        mousePos.z = 0f;
+
+        if (activeItemPreview != null) activeItemPreview.transform.position = mousePos;
+
+        if (Input.GetMouseButtonDown(1) || Input.GetKeyDown(KeyCode.Escape))
+        {
+            Destroy(activeItemPreview);
+            isPlacingItem = false;
+            selectedItemPrefab = null;
+            return;
+        }
+
+        if (Input.GetMouseButtonDown(0))
+        {
+            totalMoney -= selectedItemCost;
+            UpdateMoneyUI();
+            activeItemPreview = null;
+            isPlacingItem = false;
+            selectedItemPrefab = null;
         }
     }
 
