@@ -18,7 +18,7 @@ public class NaturalFishAI : MonoBehaviour
     [Header("Hunger & Survival Settings")]
     public float maxHunger = 30f;       
     public float hungerWarningTime = 15f; 
-    private float currentHunger = 0f;
+    [SerializeField] private float currentHunger = 0f; 
     private bool isDead = false;
 
     [Header("Growth Settings")]
@@ -53,6 +53,9 @@ public class NaturalFishAI : MonoBehaviour
     private Vector3 baseScale;
     private float facingDirectionSign = 1f;
 
+    // --- NEW LOGIC FOR ANTI-SPAM LOGS ---
+    private float logCooldownTimer = 0f;
+
     void Start()
     {
         spriteRenderer = GetComponent<SpriteRenderer>();
@@ -82,7 +85,7 @@ public class NaturalFishAI : MonoBehaviour
             return;
         }
 
-        HandleHunger();     // Runs the countdown and updates the color tracking
+        HandleHunger();     
         FindClosestFood();
         HandleClickTimer(); 
         HandleInflation(); 
@@ -90,10 +93,38 @@ public class NaturalFishAI : MonoBehaviour
         HandleVisualFacing();
     }
 
-    // --- FIX: Restored the HandleHunger calculation method ---
     void HandleHunger()
     {
-        currentHunger += Time.deltaTime;
+        LivePlant[] allPlants = FindObjectsByType<LivePlant>(FindObjectsSortMode.None);
+        float totalHungerReduction = 0f;
+
+        foreach (LivePlant plant in allPlants)
+        {
+            if (plant.isHealthy)
+            {
+                totalHungerReduction += plant.hungerSlowdownPercent;
+            }
+        }
+
+        if (totalHungerReduction > 0.75f) totalHungerReduction = 0.75f; 
+
+        // Apply the dynamic plant buffer modifier to the passage of time
+        float effectiveHungerDrain = Time.deltaTime * (1f - totalHungerReduction);
+        currentHunger += effectiveHungerDrain;
+
+        // --- ANTI-SPAM CONDITIONAL DEBUG LOGS ---
+        // Only run if the slowdown is past 10% (0.10)
+        if (totalHungerReduction >= 0.10f)
+        {
+            logCooldownTimer += Time.deltaTime;
+            // Only print once every 5 seconds so it doesn't spam every single frame!
+            if (logCooldownTimer >= 5.0f)
+            {
+                Debug.Log($"[Ecosystem] {gameObject.name} hunger is accumulating at " +
+                          $"<color=cyan>{(1f - totalHungerReduction) * 100f:F0}% speed</color> thanks to healthy plants!");
+                logCooldownTimer = 0f; // Reset the 5-second timer
+            }
+        }
 
         if (currentHunger >= maxHunger)
         {

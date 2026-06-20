@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 4335308378490470683}
   - component: {fileID: 6138251412069864526}
+  - component: {fileID: 2223755555924319425}
   m_Layer: 0
   m_Name: PlantItem
   m_TagString: Untagged
@@ -91,3 +92,22 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+--- !u!114 &2223755555924319425
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 183678643297892167}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0012458f5b517f64281ad949c6b3a46d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LivePlant
+  searchRadius: 5
+  algaeChokeThreshold: 0.5
+  hungerSlowdownPercent: 0.15
+  healthyColor: {r: 1, g: 1, b: 1, a: 1}
+  chokedColor: {r: 0.55, g: 0.45, b: 0.3, a: 1}
+  colorLerpSpeed: 2
+  isHealthy: 1
