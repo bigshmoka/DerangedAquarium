@@ -10,10 +10,12 @@ public class AquariumManager : MonoBehaviour
 
     [Header("Economy Settings")]
     public int totalMoney = 100;
+    // --- NEW: Tracks if the shop is visually open to block tools safely ---
+    [HideInInspector] public bool isShopOpen = false; 
 
     [Header("UI Windows & Tools")]
-    public TMP_Text moneyText; 
     public GameObject shopMenuWindow; 
+    public TMP_Text moneyText; 
     public TMP_Text errorNotificationText; 
     
     [Header("Feeding Tool Settings")]
@@ -37,7 +39,6 @@ public class AquariumManager : MonoBehaviour
         UpdateFeedButtonUI(); 
         UpdateSpongeButtonUI(); 
 
-        if (shopMenuWindow != null) shopMenuWindow.SetActive(false);
         if (errorNotificationText != null) errorNotificationText.gameObject.SetActive(false);
 
         // Spawn initial starting fish at a perfect, uniform baby scale (e.g., 0.4f)
@@ -65,7 +66,8 @@ public class AquariumManager : MonoBehaviour
     {
         if (Input.GetMouseButtonDown(0))
         {
-            if (shopMenuWindow != null && shopMenuWindow.activeSelf) return;
+            // --- FIX: Check our state tracker instead of the UI GameObject's active status ---
+            if (isShopOpen) return;
             if (Input.mousePosition.y < 120) return;
 
             // SCREEN BOUNDARY SAFETY CHECK (1920x1080)
@@ -88,12 +90,9 @@ public class AquariumManager : MonoBehaviour
         }
     }
 
-    // Helper function to ensure newly spawned fish are uniform and small
     void SpawnBabyFish(GameObject prefab, Vector3 position)
     {
         GameObject newFish = Instantiate(prefab, position, Quaternion.identity);
-        
-        // STRETCH PREVENTION: Force X and Y to be the exact same starting size (40% of standard size)
         float babyScale = 0.4f;
         newFish.transform.localScale = new Vector3(babyScale, babyScale, 1f);
     }
@@ -153,8 +152,9 @@ public class AquariumManager : MonoBehaviour
         }
     }
 
-    public void OpenShopMenu() { if (shopMenuWindow != null) shopMenuWindow.SetActive(true); }
-    public void CloseShopMenu() { if (shopMenuWindow != null) shopMenuWindow.SetActive(false); }
+    // --- FIX: Modernized to use state tracking flags instead of forcing active layout states ---
+    public void OpenShopMenu() { isShopOpen = true; }
+    public void CloseShopMenu() { isShopOpen = false; }
 
     public void BuyFishFromShop(GameObject fishPrefab, int cost)
     {
@@ -162,10 +162,7 @@ public class AquariumManager : MonoBehaviour
         {
             totalMoney -= cost;
             UpdateMoneyUI();
-            
-            // Spawn the shop fish as a perfect uniform baby right in the center!
             SpawnBabyFish(fishPrefab, Vector3.zero);
-
             CloseShopMenu();
         }
     }
