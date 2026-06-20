@@ -2,11 +2,10 @@ using UnityEngine;
 
 public class NaturalFishAI : MonoBehaviour
 {
-    // --- NEW: CONFIGURABLE FISH TYPES ---
-    public enum FishType { Goldfish, Tetra, Angelfish, Shark }
+    public enum FishType { Goldfish, Tetra, Angelfish, Shark, Pufferfish }
 
     [Header("Species Settings")]
-    public FishType species = FishType.Goldfish; // Shows as a clean dropdown menu in the Unity Inspector
+    public FishType species = FishType.Goldfish; 
 
     [Header("Movement Tweaks")]
     public float swimSpeed = 1.2f;
@@ -28,6 +27,16 @@ public class NaturalFishAI : MonoBehaviour
     public float growthPerBite = 0.1f;     
     private float currentScaleModifier;
 
+    [Header("Pufferfish Mechanics")]
+    public float puffInflationMultiplier = 1.8f; 
+    public float puffLerpSpeed = 5f;            
+    private float currentPuffFactor = 1f;       
+
+    [Header("Click Interaction Settings")]
+    public float clickPuffDuration = 2.0f; 
+    private bool isStartledByClick = false;
+    private float clickPuffTimer = 0f;
+
     [Header("Poop Economy")]
     public GameObject moneyDropPrefab; 
 
@@ -41,7 +50,6 @@ public class NaturalFishAI : MonoBehaviour
     private bool isChasingFood = false;
     private SpriteRenderer spriteRenderer;
 
-    // --- STRETCH PREVENTION VARIABLES ---
     private Vector3 baseScale;
     private float facingDirectionSign = 1f;
 
@@ -50,9 +58,7 @@ public class NaturalFishAI : MonoBehaviour
         spriteRenderer = GetComponent<SpriteRenderer>();
         transform.rotation = Quaternion.identity;
 
-        // 1. Capture the exact scale proportions you assigned this fish in the inspector
         baseScale = transform.localScale;
-
         currentScaleModifier = startingScale;
         UpdateFishScale();
 
@@ -76,12 +82,15 @@ public class NaturalFishAI : MonoBehaviour
             return;
         }
 
-        HandleHunger();
+        HandleHunger();     // Runs the countdown and updates the color tracking
         FindClosestFood();
+        HandleClickTimer(); 
+        HandleInflation(); 
         NavigateTank();
         HandleVisualFacing();
     }
 
+    // --- FIX: Restored the HandleHunger calculation method ---
     void HandleHunger()
     {
         currentHunger += Time.deltaTime;
@@ -93,11 +102,52 @@ public class NaturalFishAI : MonoBehaviour
         else if (currentHunger >= hungerWarningTime)
         {
             float starvationProgress = (currentHunger - hungerWarningTime) / (maxHunger - hungerWarningTime);
-            spriteRenderer.color = Color.Lerp(originalColor, sickColor, starvationProgress);
+            if (spriteRenderer != null)
+            {
+                spriteRenderer.color = Color.Lerp(originalColor, sickColor, starvationProgress);
+            }
         }
         else
         {
-            spriteRenderer.color = originalColor;
+            if (spriteRenderer != null)
+            {
+                spriteRenderer.color = originalColor;
+            }
+        }
+    }
+
+    void OnMouseDown()
+    {
+        if (species == FishType.Pufferfish && !isDead)
+        {
+            isStartledByClick = true;
+            clickPuffTimer = clickPuffDuration; 
+        }
+    }
+
+    void HandleClickTimer()
+    {
+        if (isStartledByClick)
+        {
+            clickPuffTimer -= Time.deltaTime;
+            if (clickPuffTimer <= 0f)
+            {
+                isStartledByClick = false;
+            }
+        }
+    }
+
+    void HandleInflation()
+    {
+        if (species == FishType.Pufferfish && (isChasingFood || isStartledByClick))
+        {
+            currentPuffFactor = Mathf.Lerp(currentPuffFactor, puffInflationMultiplier, Time.deltaTime * puffLerpSpeed);
+            UpdateFishScale();
+        }
+        else if (currentPuffFactor > 1f)
+        {
+            currentPuffFactor = Mathf.Lerp(currentPuffFactor, 1f, Time.deltaTime * puffLerpSpeed);
+            UpdateFishScale();
         }
     }
 
@@ -158,10 +208,7 @@ public class NaturalFishAI : MonoBehaviour
                 currentHunger = 0f; 
 
                 GrowFish();
-                
-                // --- SPAWN THE SPECIES-SPECIFIC REWARD ---
                 SpawnMoneyReward();
-
                 PickNewDestination(); 
             }
         }
@@ -171,7 +218,6 @@ public class NaturalFishAI : MonoBehaviour
         }
     }
 
-    // --- CLEANED UP: ADJUST DIRECTION TRACKING ONLY ---
     void HandleVisualFacing()
     {
         if (spriteRenderer == null) return;
@@ -189,7 +235,6 @@ public class NaturalFishAI : MonoBehaviour
             directionChanged = true;
         }
 
-        // Only recalculate the transform vector if the fish actually turns around
         if (directionChanged)
         {
             UpdateFishScale();
@@ -207,19 +252,15 @@ public class NaturalFishAI : MonoBehaviour
         UpdateFishScale();
     }
 
-    // --- FIXED: STRETCH-PROOF SCALE CALCULATOR ---
     void UpdateFishScale()
     {
-        // Instead of hardcoded numbers, we use the custom base scale values 
-        // you defined in the editor, ensuring X and Y expand perfectly together!
         transform.localScale = new Vector3(
-            baseScale.x * currentScaleModifier * facingDirectionSign, 
-            baseScale.y * currentScaleModifier, 
+            baseScale.x * currentScaleModifier * facingDirectionSign * currentPuffFactor, 
+            baseScale.y * currentScaleModifier * currentPuffFactor, 
             baseScale.z
         );
     }
 
-    // --- UPDATED: CALCULATE PAYOUT STRICTLY BY SPECIES TYPE ---
     void SpawnMoneyReward()
     {
         if (moneyDropPrefab != null)
@@ -239,6 +280,9 @@ public class NaturalFishAI : MonoBehaviour
                     break;
                 case FishType.Shark:
                     calculatedPayout = 120;
+                    break;
+                case FishType.Pufferfish:
+                    calculatedPayout = 30;
                     break;
             }
 
