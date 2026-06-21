@@ -2,6 +2,7 @@ using UnityEngine;
 
 public class NaturalFishAI : MonoBehaviour
 {
+    // --- CONFIGURABLE FISH TYPES ---
     public enum FishType { Goldfish, Tetra, Angelfish, Shark, Pufferfish }
 
     [Header("Species Settings")]
@@ -21,12 +22,19 @@ public class NaturalFishAI : MonoBehaviour
     [SerializeField] private float currentHunger = 0f; 
     private bool isDead = false;
 
+    [Header("Satiety Settings")]
+    [Tooltip("How many seconds a fish stays full and ignores food after eating.")]
+    public float fullDuration = 10f; 
+    [SerializeField] private bool isFull = false;
+    private float fullnessTimer = 0f;
+
     [Header("Growth Settings")]
     public float startingScale = 0.5f;     
     public float maxScale = 1.5f;          
     public float growthPerBite = 0.1f;     
     private float currentScaleModifier;
 
+    // --- PUFFERFISH MECHANICS ---
     [Header("Pufferfish Mechanics")]
     public float puffInflationMultiplier = 1.8f; 
     public float puffLerpSpeed = 5f;            
@@ -53,7 +61,7 @@ public class NaturalFishAI : MonoBehaviour
     private Vector3 baseScale;
     private float facingDirectionSign = 1f;
 
-    // --- NEW LOGIC FOR ANTI-SPAM LOGS ---
+    // --- ANTI-SPAM LOG COOLDOWN TIMER ---
     private float logCooldownTimer = 0f;
 
     void Start()
@@ -86,6 +94,7 @@ public class NaturalFishAI : MonoBehaviour
         }
 
         HandleHunger();     
+        HandleFullness();   
         FindClosestFood();
         HandleClickTimer(); 
         HandleInflation(); 
@@ -95,6 +104,15 @@ public class NaturalFishAI : MonoBehaviour
 
     void HandleHunger()
     {
+        // If the fish is completely full, freeze hunger progression at 0
+        if (isFull)
+        {
+            currentHunger = 0f;
+            if (spriteRenderer != null) spriteRenderer.color = originalColor;
+            return;
+        }
+
+        // Gather ecosystem dynamic buffering reduction from healthy plants in scene
         LivePlant[] allPlants = FindObjectsByType<LivePlant>(FindObjectsSortMode.None);
         float totalHungerReduction = 0f;
 
@@ -108,21 +126,18 @@ public class NaturalFishAI : MonoBehaviour
 
         if (totalHungerReduction > 0.75f) totalHungerReduction = 0.75f; 
 
-        // Apply the dynamic plant buffer modifier to the passage of time
         float effectiveHungerDrain = Time.deltaTime * (1f - totalHungerReduction);
         currentHunger += effectiveHungerDrain;
 
-        // --- ANTI-SPAM CONDITIONAL DEBUG LOGS ---
-        // Only run if the slowdown is past 10% (0.10)
+        // Anti-spam diagnostic log system
         if (totalHungerReduction >= 0.10f)
         {
             logCooldownTimer += Time.deltaTime;
-            // Only print once every 5 seconds so it doesn't spam every single frame!
             if (logCooldownTimer >= 5.0f)
             {
                 Debug.Log($"[Ecosystem] {gameObject.name} hunger is accumulating at " +
                           $"<color=cyan>{(1f - totalHungerReduction) * 100f:F0}% speed</color> thanks to healthy plants!");
-                logCooldownTimer = 0f; // Reset the 5-second timer
+                logCooldownTimer = 0f; 
             }
         }
 
@@ -147,6 +162,19 @@ public class NaturalFishAI : MonoBehaviour
         }
     }
 
+    void HandleFullness()
+    {
+        if (isFull)
+        {
+            fullnessTimer -= Time.deltaTime;
+            if (fullnessTimer <= 0f)
+            {
+                isFull = false; // Digestion complete! Fish can hunt for food pellets again
+            }
+        }
+    }
+
+    // --- RE-IMPLEMENTED: INTERACTION TAPS ---
     void OnMouseDown()
     {
         if (species == FishType.Pufferfish && !isDead)
@@ -168,6 +196,7 @@ public class NaturalFishAI : MonoBehaviour
         }
     }
 
+    // --- RE-IMPLEMENTED: SMOOTH INTERPOLATION INFLATION ---
     void HandleInflation()
     {
         if (species == FishType.Pufferfish && (isChasingFood || isStartledByClick))
@@ -184,6 +213,18 @@ public class NaturalFishAI : MonoBehaviour
 
     void FindClosestFood()
     {
+        if (isFull) 
+        {
+            if (isChasingFood)
+            {
+                if (currentFoodTarget != null) currentFoodTarget.isTargeted = false;
+                currentFoodTarget = null;
+                isChasingFood = false;
+                PickNewDestination();
+            }
+            return; 
+        }
+
         if (currentFoodTarget != null) return;
 
         FishFood[] availableFood = FindObjectsByType<FishFood>(FindObjectsSortMode.None);
@@ -236,7 +277,11 @@ public class NaturalFishAI : MonoBehaviour
                 Destroy(currentFoodTarget.gameObject); 
                 currentFoodTarget = null;
                 isChasingFood = false;
+                
+                // Engage fullness protection immediately upon digestion
                 currentHunger = 0f; 
+                isFull = true;
+                fullnessTimer = fullDuration; 
 
                 GrowFish();
                 SpawnMoneyReward();
@@ -283,6 +328,7 @@ public class NaturalFishAI : MonoBehaviour
         UpdateFishScale();
     }
 
+    // --- RE-IMPLEMENTED WITH PUFF FACTORS ---
     void UpdateFishScale()
     {
         transform.localScale = new Vector3(
@@ -312,7 +358,7 @@ public class NaturalFishAI : MonoBehaviour
                 case FishType.Shark:
                     calculatedPayout = 120;
                     break;
-                case FishType.Pufferfish:
+                case FishType.Pufferfish: // Handles puffer economy
                     calculatedPayout = 30;
                     break;
             }
