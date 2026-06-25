@@ -1,6 +1,8 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using UnityEngine.SceneManagement;
+using UnityEngine.EventSystems; // Required for UI click blocking
 
 public class AquariumManager : MonoBehaviour
 {
@@ -33,7 +35,7 @@ public class AquariumManager : MonoBehaviour
     private GameObject selectedDecorationPrefab;
     private int selectedDecorationCost;
 
-    // --- NEW: Item Placement Variables ---
+    // --- Item Placement Variables ---
     private GameObject activeItemPreview;
     private bool isPlacingItem = false;
     private GameObject selectedItemPrefab;
@@ -41,6 +43,12 @@ public class AquariumManager : MonoBehaviour
 
     void Start()
     {
+        // SAFE ACTIVE SCENE CAPTURE
+        if (gameObject.scene.isLoaded)
+        {
+            SceneManager.SetActiveScene(gameObject.scene);
+        }
+
         UpdateMoneyUI(); 
         UpdateFeedButtonUI(); 
         UpdateSpongeButtonUI(); 
@@ -61,7 +69,7 @@ public class AquariumManager : MonoBehaviour
         {
             HandleDecorationPlacement();
         }
-        else if (isPlacingItem) // Handles moving item with mouse preview
+        else if (isPlacingItem) 
         {
             HandleItemPlacement();
         }
@@ -77,6 +85,13 @@ public class AquariumManager : MonoBehaviour
         {
             if (isShopOpen) return;
             if (Input.mousePosition.y < 120) return;
+
+            // --- UI CLICK BLOCKING SAFETY ---
+            // Blocks clicks from dropping food if the mouse is hovering directly over buttons/canvas tools
+            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+            {
+                return;
+            }
 
             if (Input.mousePosition.x < 0 || Input.mousePosition.x > 1920 ||
                 Input.mousePosition.y < 0 || Input.mousePosition.y > 1080)
@@ -232,7 +247,6 @@ public class AquariumManager : MonoBehaviour
         }
     }
 
-    // --- FIX: THIS IS THE METHOD THAT WAS MISSING ---
     public void SelectItemFromShop(GameObject itemPrefab, int cost)
     {
         if (totalMoney >= cost && itemPrefab != null && !isPlacingDecoration && !isPlacingItem)
@@ -249,7 +263,6 @@ public class AquariumManager : MonoBehaviour
             Vector3 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
             mousePos.z = 0f;
 
-            // Instantiates item preview at mouse location
             activeItemPreview = Instantiate(selectedItemPrefab, mousePos, Quaternion.identity);
             isPlacingItem = true;
         }
@@ -259,7 +272,6 @@ public class AquariumManager : MonoBehaviour
         }
     }
 
-    // Handles moving and confirming item placement
     void HandleItemPlacement()
     {
         Vector3 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
