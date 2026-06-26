@@ -10,6 +10,9 @@ public class GameSaveData
     public int walletBalance = 100;
     public List<PlacedItemDataWrapper> placed3DItems = new List<PlacedItemDataWrapper>();
     public List<AquariumItemDataWrapper> placed2DItems = new List<AquariumItemDataWrapper>();
+    
+    // --- NEW: TANK CLEANLINESS SIMULATION DATA STORAGE LIST ---
+    public List<float> algaeNodeLevels = new List<float>();
 }
 
 [System.Serializable]
@@ -29,8 +32,6 @@ public class AquariumItemDataWrapper
     public Vector3 localScale; 
     public float fishScaleModifier;
     public Vector3 fishBaseScale;
-    
-    // --- FIXED: SAVE DIRECTION FOR FLIP DETECTION SYSTEM ---
     public float fishFacingSign = 1f; 
 }
 
@@ -123,10 +124,27 @@ public class SaveManager : MonoBehaviour
             }
         }
 
+        // --- NEW: CAPTURE ALGAE TANK CLEANLINESS STATES ---
+        AlgaeManager algaeManager = FindFirstObjectByType<AlgaeManager>();
+        if (algaeManager != null && algaeManager.algaeNodes != null)
+        {
+            foreach (AlgaeNode node in algaeManager.algaeNodes)
+            {
+                if (node != null)
+                {
+                    dataToSave.algaeNodeLevels.Add(node.currentAlgaeLevel);
+                }
+                else
+                {
+                    dataToSave.algaeNodeLevels.Add(0f); // Index alignment fallback safety
+                }
+            }
+        }
+
         string jsonString = JsonUtility.ToJson(dataToSave, true);
         File.WriteAllText(saveFilePath, jsonString);
 
-        Debug.Log($"<color=green>[Save System]</color> Full Game Saved (3D Shop & 2D Tank) to: {saveFilePath}");
+        Debug.Log($"<color=green>[Save System]</color> Full Game Saved (3D Shop, 2D Tank, & Cleanliness) to: {saveFilePath}");
     }
 
     public void LoadGame()
@@ -195,14 +213,11 @@ public class SaveManager : MonoBehaviour
                     NaturalFishAI fishAI = loaded2DInstance.GetComponent<NaturalFishAI>();
                     SnailAI snailAI = loaded2DInstance.GetComponent<SnailAI>();
 
-                    // --- FIXED: INJECT GROWTH STAGES DIRECTLY BEFORE WAKING SCRIPTS ---
                     if (fishAI != null)
                     {
                         fishAI.baseScale = saved2DItem.fishBaseScale != Vector3.zero ? saved2DItem.fishBaseScale : new Vector3(0.4f, 0.4f, 1f);
                         fishAI.currentScaleModifier = saved2DItem.fishScaleModifier > 0f ? saved2DItem.fishScaleModifier : fishAI.startingScale;
                         fishAI.facingDirectionSign = saved2DItem.fishFacingSign != 0f ? saved2DItem.fishFacingSign : 1f;
-                        
-                        // Natively assign current rendering local scale configuration immediately
                         loaded2DInstance.transform.localScale = saved2DItem.localScale;
                     }
                     else if (snailAI != null)
@@ -212,7 +227,6 @@ public class SaveManager : MonoBehaviour
                     }
                     else
                     {
-                        // Fallback stretch properties only for basic decorations and auto-feeders
                         StartCoroutine(ApplyDelayedScale(loaded2DInstance, saved2DItem.localScale));
                     }
 
@@ -228,6 +242,20 @@ public class SaveManager : MonoBehaviour
                 else
                 {
                     Debug.LogError($"[Save System] Failed to find 2D asset: 'AquariumPrefabs/{saved2DItem.prefabResourceName}'.");
+                }
+            }
+        }
+
+        // --- NEW: RESTORE ALGAE TANK CLEANLINESS STATES ---
+        AlgaeManager algaeManager = FindFirstObjectByType<AlgaeManager>();
+        if (algaeManager != null && algaeManager.algaeNodes != null && loadedData.algaeNodeLevels != null)
+        {
+            int nodeCount = Mathf.Min(algaeManager.algaeNodes.Length, loadedData.algaeNodeLevels.Count);
+            for (int i = 0; i < nodeCount; i++)
+            {
+                if (algaeManager.algaeNodes[i] != null)
+                {
+                    algaeManager.algaeNodes[i].InitializeAlgaeLevel(loadedData.algaeNodeLevels[i]);
                 }
             }
         }

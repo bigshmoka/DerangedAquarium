@@ -56,7 +56,8 @@ public class AlgaeNode : MonoBehaviour
         }
     }
 
-    void UpdateVisuals()
+    // --- FIXED: EXPOSED AS PUBLIC TO ALLOW DYNAMIC REBINDING RECONSTRUCTIONS ---
+    public void UpdateVisuals()
     {
         if (spriteRenderer != null)
         {
@@ -64,5 +65,12 @@ public class AlgaeNode : MonoBehaviour
             c.a = currentAlgaeLevel;
             spriteRenderer.color = c;
         }
+    }
+
+    // --- NEW: REGISTRY INITIALIZATION INJECTION ENTRY ---
+    public void InitializeAlgaeLevel(float level)
+    {
+        currentAlgaeLevel = level;
+        UpdateVisuals();
     }
 }
