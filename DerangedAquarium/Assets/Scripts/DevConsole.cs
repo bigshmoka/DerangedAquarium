@@ -8,7 +8,7 @@ public class DevConsole : MonoBehaviour
     public TMP_InputField commandInputField;
 
     [Header("Console Toggle Key")]
-    public KeyCode toggleKey = KeyCode.BackQuote; // The tilde/backquote key (~)
+    public KeyCode toggleKey = KeyCode.BackQuote; 
 
     private bool isConsoleOpen = false;
 
@@ -19,10 +19,6 @@ public class DevConsole : MonoBehaviour
         if (commandInputField != null) 
         {
             commandInputField.DeactivateInputField();
-
-            // --- THE BULLETPROOF EVENT FIX ---
-            // We strip out manual Enter checks from Update and hook directly into TMPro's 
-            // native listener. This will catch the Enter key 100% of the time!
             commandInputField.onSubmit.RemoveAllListeners();
             commandInputField.onSubmit.AddListener(ProcessSubmittedText);
         }
@@ -30,7 +26,6 @@ public class DevConsole : MonoBehaviour
 
     void Update()
     {
-        // Toggle console with the tilde key (~)
         if (Input.GetKeyDown(toggleKey))
         {
             ToggleConsole();
@@ -78,7 +73,6 @@ public class DevConsole : MonoBehaviour
 
     private void ProcessSubmittedText(string rawInput)
     {
-        // Ignore empty submissions
         if (string.IsNullOrEmpty(rawInput)) return;
 
         string cleanedInput = rawInput.Trim();
@@ -103,14 +97,20 @@ public class DevConsole : MonoBehaviour
                 ExecuteClearStorefrontItemsCheat();
                 break;
 
+            // --- NEW: SYSTEM STORAGE CONSOLE CODES ---
+            case "save":
+                if (SaveManager.Instance != null) SaveManager.Instance.SaveGame();
+                break;
+
+            case "load":
+                if (SaveManager.Instance != null) SaveManager.Instance.LoadGame();
+                break;
+
             default:
-                Debug.LogWarning($"[Console] Unrecognized command code execution signature: '{mainCommand}'");
+                Debug.LogWarning($"[Console] Unrecognized command code signature: '{mainCommand}'");
                 break;
         }
 
-        // --- NEW: KEEP INPUT FOCUS COMFORTABLE ---
-        // If the console is still open, wipe the old text and keep the cursor flashing inside 
-        // the input field so you can rapidly type your next cheat command back-to-back!
         if (isConsoleOpen && commandInputField != null)
         {
             commandInputField.text = "";
@@ -125,16 +125,8 @@ public class DevConsole : MonoBehaviour
             if (GlobalEconomyManager.Instance != null)
             {
                 GlobalEconomyManager.Instance.AddMoney(moneyAmt);
-                Debug.Log($"<color=green>[Console] Cheat Success:</color> Deposited +${moneyAmt} into global central wallet authority ledger.");
+                Debug.Log($"<color=green>[Console] Cheat Success:</color> Deposited +${moneyAmt} into global wallet ledger.");
             }
-            else
-            {
-                Debug.LogError("[Console] Error: GlobalEconomyManager instance could not be located.");
-            }
-        }
-        else
-        {
-            Debug.LogWarning("[Console] Invalid syntax structure parameters. Expected: 'money <integer_amount>'");
         }
     }
 
@@ -147,10 +139,6 @@ public class DevConsole : MonoBehaviour
             currentActiveTankManager.SpawnBabyFish(currentActiveTankManager.fishPrefab, Vector3.zero);
             Debug.Log("<color=cyan>[Console]</color> Spawned extra cheat test fish directly at tank center origin point coordinates.");
         }
-        else
-        {
-            Debug.LogWarning("[Console] Cannot process 'spawnfish' command. No active AquariumManager or fish prefab detected.");
-        }
     }
 
     private void ExecuteClearStorefrontItemsCheat()
@@ -160,17 +148,11 @@ public class DevConsole : MonoBehaviour
         if (placedContainer != null && placedContainer.transform.childCount > 0)
         {
             int structuralChildCount = placedContainer.transform.childCount;
-            
             for (int i = structuralChildCount - 1; i >= 0; i--)
             {
                 Destroy(placedContainer.transform.GetChild(i).gameObject);
             }
-            
             Debug.Log($"<color=red>[Console]</color> Swept and wiped clean all {structuralChildCount} active placed items.");
-        }
-        else
-        {
-            Debug.Log("[Console] Storefront items branch tree clean container node already stands completely empty.");
         }
     }
 }

@@ -32,7 +32,11 @@ public class NaturalFishAI : MonoBehaviour
     public float startingScale = 0.5f;     
     public float maxScale = 1.5f;          
     public float growthPerBite = 0.1f;     
-    private float currentScaleModifier;
+    
+    // --- FIXED: EXPOSED DATA SCOPES FOR CONSOLE STORAGE LINKAGES ---
+    [HideInInspector] public float currentScaleModifier;
+    [HideInInspector] public Vector3 baseScale;
+    [HideInInspector] public float facingDirectionSign = 1f;
 
     // --- PUFFERFISH MECHANICS ---
     [Header("Pufferfish Mechanics")]
@@ -58,9 +62,6 @@ public class NaturalFishAI : MonoBehaviour
     private bool isChasingFood = false;
     private SpriteRenderer spriteRenderer;
 
-    private Vector3 baseScale;
-    private float facingDirectionSign = 1f;
-
     // --- ANTI-SPAM LOG COOLDOWN TIMER ---
     private float logCooldownTimer = 0f;
 
@@ -69,8 +70,12 @@ public class NaturalFishAI : MonoBehaviour
         spriteRenderer = GetComponent<SpriteRenderer>();
         transform.rotation = Quaternion.identity;
 
-        baseScale = transform.localScale;
-        currentScaleModifier = startingScale;
+        // --- FIXED: SKIP OVERWRITING DEFAULTS IF DATA PRE-EXISTED ON INJECTION ---
+        if (baseScale == Vector3.zero)
+        {
+            baseScale = transform.localScale;
+            currentScaleModifier = startingScale;
+        }
         UpdateFishScale();
 
         if (spriteRenderer != null)
@@ -104,7 +109,6 @@ public class NaturalFishAI : MonoBehaviour
 
     void HandleHunger()
     {
-        // If the fish is completely full, freeze hunger progression at 0
         if (isFull)
         {
             currentHunger = 0f;
@@ -112,7 +116,6 @@ public class NaturalFishAI : MonoBehaviour
             return;
         }
 
-        // Gather ecosystem dynamic buffering reduction from healthy plants in scene
         LivePlant[] allPlants = FindObjectsByType<LivePlant>(FindObjectsSortMode.None);
         float totalHungerReduction = 0f;
 
@@ -129,7 +132,6 @@ public class NaturalFishAI : MonoBehaviour
         float effectiveHungerDrain = Time.deltaTime * (1f - totalHungerReduction);
         currentHunger += effectiveHungerDrain;
 
-        // Anti-spam diagnostic log system
         if (totalHungerReduction >= 0.10f)
         {
             logCooldownTimer += Time.deltaTime;
@@ -169,12 +171,11 @@ public class NaturalFishAI : MonoBehaviour
             fullnessTimer -= Time.deltaTime;
             if (fullnessTimer <= 0f)
             {
-                isFull = false; // Digestion complete! Fish can hunt for food pellets again
+                isFull = false; 
             }
         }
     }
 
-    // --- RE-IMPLEMENTED: INTERACTION TAPS ---
     void OnMouseDown()
     {
         if (species == FishType.Pufferfish && !isDead)
@@ -196,7 +197,6 @@ public class NaturalFishAI : MonoBehaviour
         }
     }
 
-    // --- RE-IMPLEMENTED: SMOOTH INTERPOLATION INFLATION ---
     void HandleInflation()
     {
         if (species == FishType.Pufferfish && (isChasingFood || isStartledByClick))
@@ -278,7 +278,6 @@ public class NaturalFishAI : MonoBehaviour
                 currentFoodTarget = null;
                 isChasingFood = false;
                 
-                // Engage fullness protection immediately upon digestion
                 currentHunger = 0f; 
                 isFull = true;
                 fullnessTimer = fullDuration; 
@@ -328,8 +327,7 @@ public class NaturalFishAI : MonoBehaviour
         UpdateFishScale();
     }
 
-    // --- RE-IMPLEMENTED WITH PUFF FACTORS ---
-    void UpdateFishScale()
+    public void UpdateFishScale()
     {
         transform.localScale = new Vector3(
             baseScale.x * currentScaleModifier * facingDirectionSign * currentPuffFactor, 
@@ -338,7 +336,6 @@ public class NaturalFishAI : MonoBehaviour
         );
     }
 
-    // --- UPDATED SPAWNING METHOD ---
     void SpawnMoneyReward()
     {
         if (moneyDropPrefab != null)
@@ -359,13 +356,11 @@ public class NaturalFishAI : MonoBehaviour
                 case FishType.Shark:
                     calculatedPayout = 120;
                     break;
-                case FishType.Pufferfish: // Handles puffer economy
+                case FishType.Pufferfish: 
                     calculatedPayout = 30;
                     break;
             }
 
-            // --- THE FIXED HIERARCHY ATTACHMENT ---
-            // Grabs the router manager, fetches the safe container, and nests the coin safely inside it
             AquariumManager manager = FindFirstObjectByType<AquariumManager>();
             Transform container = (manager != null) ? manager.GetBubbleContainer() : null;
 

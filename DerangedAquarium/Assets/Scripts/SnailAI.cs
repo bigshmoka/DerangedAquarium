@@ -3,49 +3,45 @@ using UnityEngine;
 public class SnailAI : MonoBehaviour
 {
     [Header("Movement Settings")]
-    public float crawlSpeed = 0.5f; // Snails are slow and steady!
-    public float floorY = -3.5f;    // The base floor height of your tank
+    public float crawlSpeed = 0.5f; 
+    public float floorY = -3.5f;    
 
     [Header("Cleaning Settings")]
-    public float cleaningPower = 0.15f; // How much algae it cleans per second
-    public float eatInterval = 0.5f;    // Time between bites
-    public int coinsPerSwipe = 5;       // --- NEW: Custom reward amount per swipe!
+    public float cleaningPower = 0.15f; 
+    public float eatInterval = 0.5f;    
+    public int coinsPerSwipe = 5;       
 
     [Header("Pop Off Customization")]
     [Range(0, 100)] 
-    public int popOffChancePercentage = 20; // Change your % chance directly in the inspector!
-    public float minPopOffDistance = 3.0f;  // Minimum distance it can pop out
-    public float maxPopOffDistance = 5.0f;  // Maximum distance it can pop out
-    public float popOffLaunchSpeed = 1.5f;  // How fast it moves away from the wall during the pop phase
-    public float floatFallSpeed = 0.8f;     // Sinking speed
-    public float tumbleRotationSpeed = 60f; // Spin speed while falling
+    public int popOffChancePercentage = 20; 
+    public float minPopOffDistance = 3.0f;  
+    public float maxPopOffDistance = 5.0f;  
+    public float popOffLaunchSpeed = 1.5f;  
+    public float floatFallSpeed = 0.8f;     
+    public float tumbleRotationSpeed = 60f; 
 
     [Header("Scraping Animation")]
-    public float scrapingSpeed = 2.0f;     // Slowed down default value for a better look!
-    public float scrapingDistance = 0.25f; // How far it moves from the center of the algae node
+    public float scrapingSpeed = 2.0f;     
+    public float scrapingDistance = 0.25f; 
 
     private AlgaeManager algaeManager;
     private AlgaeNode currentTargetNode;
     private Vector3 targetPosition;
     private float eatTimer = 0f;
 
-    // --- NEW: ECONOMY TRACKING ---
     private AquariumManager aquariumManager;
 
-    // --- STRETCH PREVENTION ---
-    private Vector3 originalScale;
+    // --- FIXED: EXPOSED DATA SCOPES FOR CONSOLE STORAGE STORAGE LINKAGES ---
+    [HideInInspector] public Vector3 originalScale;
 
-    // --- GROUNDED PATHFINDING ---
     private Vector3 currentWayPoint;
     private bool hasWayPoint = false;
 
-    // --- FLOAT & LAUNCH STATES ---
     private bool isFloatingDown = false;
     private bool isPoppingOut = false;      
     private Vector3 popTargetPosition;      
     private float currentTumbleAngle = 0f;
 
-    // --- SMOOTH LANDING SYSTEM ---
     private float landingZoneThreshold = 0.5f; 
     private Quaternion rotationAtLandingZoneStart;
     private float landingProgress = 0f;
@@ -53,14 +49,14 @@ public class SnailAI : MonoBehaviour
 
     void Start()
     {
-        originalScale = transform.localScale;
+        // --- FIXED: PREVENT SQUASHING INJECTED BABY SCALE RULES ---
+        if (originalScale == Vector3.zero)
+        {
+            originalScale = transform.localScale;
+        }
 
-        // Snap the snail's height directly to the floor instantly so it doesn't float in the center
         transform.position = new Vector3(transform.position.x, floorY, transform.position.z);
-
         algaeManager = FindFirstObjectByType<AlgaeManager>();
-        
-        // --- NEW: Link directly to the aquarium manager system ---
         aquariumManager = FindFirstObjectByType<AquariumManager>();
 
         PickRandomFloorTarget();
@@ -68,7 +64,6 @@ public class SnailAI : MonoBehaviour
 
     void Update()
     {
-        // 1. IF FLOATING/POPPING: Handle special animations, bypass standard loops
         if (isFloatingDown)
         {
             HandleFloatingDownEffect();
@@ -77,10 +72,8 @@ public class SnailAI : MonoBehaviour
 
         if (algaeManager == null) return;
 
-        // 2. TARGET ACQUISITION & INSPECTOR-BASED DICE ROLL
         if (currentTargetNode == null || currentTargetNode.currentAlgaeLevel <= 0.05f)
         {
-            // If we WERE just eating a node high up on a side wall, roll the custom percentage chance
             if (currentTargetNode != null && Mathf.Abs(transform.position.y - floorY) > 0.5f)
             {
                 int randomRoll = Random.Range(0, 100);
@@ -111,7 +104,6 @@ public class SnailAI : MonoBehaviour
             CalculateStickyPath();
         }
 
-        // 3. ACTION EXECUTION
         if (currentTargetNode != null && Vector3.Distance(transform.position, currentTargetNode.transform.position) < 0.5f)
         {
             StartCleaning();
@@ -169,12 +161,9 @@ public class SnailAI : MonoBehaviour
             {
                 currentTargetNode.CleanAlgae(cleaningPower * eatInterval);
 
-                // --- NEW: DIRECT WALLET INJECTION LOOP ---
                 if (aquariumManager != null)
                 {
                     aquariumManager.totalMoney += coinsPerSwipe;
-                    
-                    // Directly run the helper function from your manager script to update the text mesh layout instantly
                     aquariumManager.Invoke("UpdateMoneyUI", 0f); 
                 }
             }
@@ -293,7 +282,6 @@ public class SnailAI : MonoBehaviour
         {
             if (transform.position.x > 0f)
             {
-                // --- RIGHT WALL ---
                 if (isEating)
                 {
                     float lookDirection = (waveVelocity >= 0f) ? 1f : -1f;
@@ -317,7 +305,6 @@ public class SnailAI : MonoBehaviour
             }
             else
             {
-                // --- LEFT WALL ---
                 if (isEating)
                 {
                     float lookDirection = (waveVelocity >= 0f) ? -1f : 1f;
@@ -342,7 +329,6 @@ public class SnailAI : MonoBehaviour
             return;
         }
 
-        // --- STANDARD HORIZONTAL FLOORS ---
         transform.rotation = Quaternion.identity;
 
         if (isEating)
