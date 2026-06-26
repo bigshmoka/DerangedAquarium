@@ -25,7 +25,6 @@ public class AquariumManager : MonoBehaviour
     public Button spongeToolButton;     
     public TMP_Text spongeToolText;     
 
-    // --- NEW: GLOBAL VISIBILITY TRACKER FLAG ---
     [HideInInspector] public bool isTankVisible = true;
 
     private TankEconomy economy;
@@ -50,18 +49,16 @@ public class AquariumManager : MonoBehaviour
 
     void Awake()
     {
+        // 1. Fetch or attach all sub-component modules
         economy = gameObject.GetComponent<TankEconomy>() ?? gameObject.AddComponent<TankEconomy>();
         shopUI = gameObject.GetComponent<TankShopUI>() ?? gameObject.AddComponent<TankShopUI>();
         hierarchyTracker = gameObject.GetComponent<TankHierarchyTracker>() ?? gameObject.AddComponent<TankHierarchyTracker>();
         placementSystem = gameObject.GetComponent<TankPlacementSystem>() ?? gameObject.AddComponent<TankPlacementSystem>();
         inputHandler = gameObject.GetComponent<TankInputHandler>() ?? gameObject.AddComponent<TankInputHandler>();
 
-        economy.Initialize(shopUI);
-        placementSystem.Initialize(economy, shopUI);
-        inputHandler.Initialize(shopUI, placementSystem, hierarchyTracker);
-
-        economy.totalMoney = totalMoneySetting;
-
+        // 2. --- FIX: ASSIGN UI REFERENCES FIRST ---
+        // We populate these variables BEFORE initializing systems so that components
+        // like TankEconomy can see and register the moneyText component successfully!
         shopUI.shopMenuWindow = shopMenuWindow;
         shopUI.moneyText = moneyText;
         shopUI.errorNotificationText = errorNotificationText;
@@ -71,6 +68,11 @@ public class AquariumManager : MonoBehaviour
         shopUI.spongeToolText = spongeToolText;
 
         inputHandler.foodPrefab = foodPrefab;
+
+        // 3. Now initialize sub-systems safely with populated data fields
+        economy.Initialize(shopUI);
+        placementSystem.Initialize(economy, shopUI);
+        inputHandler.Initialize(shopUI, placementSystem, hierarchyTracker);
     }
 
     void Start()

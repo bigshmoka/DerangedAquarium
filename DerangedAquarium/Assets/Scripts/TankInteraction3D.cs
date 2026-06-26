@@ -18,10 +18,7 @@ public class TankInteraction3D : MonoBehaviour
     {
         if (pressEPromptUI != null) pressEPromptUI.SetActive(false);
 
-        // --- THE PRE-LOADING FIX ---
-        // This instantly loads the aquarium scene in the background on frame 1.
-        // It guarantees your AquariumManager is alive right away so dev commands work
-        // from the second the game boots, and eliminates any lag spike when entering!
+        // Pre-load the aquarium scene in the background on frame 1
         Scene aquariumScene = SceneManager.GetSceneByName(aquariumSceneName);
         if (!aquariumScene.isLoaded)
         {
@@ -32,7 +29,7 @@ public class TankInteraction3D : MonoBehaviour
 
     private System.Collections.IEnumerator InitializeTankVisibilityOnStart()
     {
-        // Wait exactly one frame to let the additive scene objects awake and initialize safely
+        // Wait exactly one frame to let the additive scene objects awake safely
         yield return null;
         Toggle2DAquariumVisibility(false);
     }
@@ -59,8 +56,16 @@ public class TankInteraction3D : MonoBehaviour
         if (localPlayer != null) localPlayer.SetPlayerLockState(true);
         if (Camera.main != null) Camera.main.gameObject.SetActive(false);
 
-        // Since it's pre-loaded in Start(), we just turn on its components!
+        // Turn on all 2D aquarium assets
         Toggle2DAquariumVisibility(true);
+
+        // --- NEW: HIDE THE 3D STOREFRONT HUD MONEY TEXT ---
+        // Dynamically locate the 3D HUD component and safely disable its money display text mesh box
+        HUD3DController hud3D = FindFirstObjectByType<HUD3DController>();
+        if (hud3D != null)
+        {
+            hud3D.SetMoneyTextVisibility(false);
+        }
 
         // UNLOCK MOUSE FOR TANK MENU NAVIGATING
         Cursor.lockState = CursorLockMode.None;
@@ -73,8 +78,16 @@ public class TankInteraction3D : MonoBehaviour
 
         if (localPlayer != null) localPlayer.SetPlayerLockState(false);
 
-        // Hide the 2D art assets from the 3D camera view while keeping scripts running perfectly!
+        // Hide the 2D art assets from the 3D camera view
         Toggle2DAquariumVisibility(false);
+
+        // --- NEW: RESTORE THE 3D STOREFRONT HUD MONEY TEXT ---
+        // Turn the 3D shop's money text layout back on seamlessly as you stand up
+        HUD3DController hud3D = FindFirstObjectByType<HUD3DController>();
+        if (hud3D != null)
+        {
+            hud3D.SetMoneyTextVisibility(true);
+        }
 
         Camera playerCam = localPlayer.playerCamera.GetComponent<Camera>();
         if (playerCam != null) playerCam.gameObject.SetActive(true);
@@ -128,7 +141,6 @@ public class TankInteraction3D : MonoBehaviour
     // --- 3D TRIGGER DETECTIONS ---
     void OnTriggerEnter(Collider other)
     {
-        // Prints out the name of ANY 3D object that walks into your tank zone
         Debug.Log($"[Tank Trigger] Something entered the zone: {other.gameObject.name}");
 
         PlayerController3D player = other.GetComponent<Collider>().GetComponent<PlayerController3D>();
