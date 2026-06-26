@@ -47,8 +47,13 @@ public class AutoFeeder : MonoBehaviour
         // Calculate the drop position slightly below the feeder's center sprite anchor
         Vector3 dropPosition = new Vector3(transform.position.x, transform.position.y + dropYOffset, transform.position.z);
         
-        // Drop the food pellet into the aquarium
-        GameObject newFood = Instantiate(foodPrefab, dropPosition, Quaternion.identity);
+        // --- THE FIXED HIERARCHY ATTACHMENT ---
+        // Fetch the router manager and retrieve the designated container folder for food items
+        AquariumManager manager = FindFirstObjectByType<AquariumManager>();
+        Transform container = (manager != null) ? manager.GetFoodContainer() : null;
+
+        // Drop the food pellet into the aquarium nested safely under the container folder
+        GameObject newFood = Instantiate(foodPrefab, dropPosition, Quaternion.identity, container);
         newFood.name = "AutoFed_FoodPellet";
     }
 

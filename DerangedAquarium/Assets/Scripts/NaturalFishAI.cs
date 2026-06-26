@@ -338,6 +338,7 @@ public class NaturalFishAI : MonoBehaviour
         );
     }
 
+    // --- UPDATED SPAWNING METHOD ---
     void SpawnMoneyReward()
     {
         if (moneyDropPrefab != null)
@@ -363,7 +364,12 @@ public class NaturalFishAI : MonoBehaviour
                     break;
             }
 
-            GameObject groundCoin = Instantiate(moneyDropPrefab, transform.position, Quaternion.identity);
+            // --- THE FIXED HIERARCHY ATTACHMENT ---
+            // Grabs the router manager, fetches the safe container, and nests the coin safely inside it
+            AquariumManager manager = FindFirstObjectByType<AquariumManager>();
+            Transform container = (manager != null) ? manager.GetBubbleContainer() : null;
+
+            GameObject groundCoin = Instantiate(moneyDropPrefab, transform.position, Quaternion.identity, container);
             
             MoneyDropItem coinScript = groundCoin.GetComponent<MoneyDropItem>();
             if (coinScript != null)

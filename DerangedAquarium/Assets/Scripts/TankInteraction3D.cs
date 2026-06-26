@@ -12,12 +12,29 @@ public class TankInteraction3D : MonoBehaviour
 
     private bool isPlayerNearby = false;
     private bool isViewingTank = false;
-    private bool hasSceneBeenLoadedOnce = false;
     private PlayerController3D localPlayer;
 
     void Start()
     {
         if (pressEPromptUI != null) pressEPromptUI.SetActive(false);
+
+        // --- THE PRE-LOADING FIX ---
+        // This instantly loads the aquarium scene in the background on frame 1.
+        // It guarantees your AquariumManager is alive right away so dev commands work
+        // from the second the game boots, and eliminates any lag spike when entering!
+        Scene aquariumScene = SceneManager.GetSceneByName(aquariumSceneName);
+        if (!aquariumScene.isLoaded)
+        {
+            SceneManager.LoadScene(aquariumSceneName, LoadSceneMode.Additive);
+            StartCoroutine(InitializeTankVisibilityOnStart());
+        }
+    }
+
+    private System.Collections.IEnumerator InitializeTankVisibilityOnStart()
+    {
+        // Wait exactly one frame to let the additive scene objects awake and initialize safely
+        yield return null;
+        Toggle2DAquariumVisibility(false);
     }
 
     void Update()
@@ -28,7 +45,6 @@ public class TankInteraction3D : MonoBehaviour
             EnterAquariumView();
         }
         // Case 2: Player wants to step away into the 3D shop using 'Q'
-        // Using 'Q' prevents the Unity Editor from stealing mouse focus!
         else if (isViewingTank && Input.GetKeyDown(KeyCode.Q))
         {
             ExitAquariumView();
@@ -43,15 +59,8 @@ public class TankInteraction3D : MonoBehaviour
         if (localPlayer != null) localPlayer.SetPlayerLockState(true);
         if (Camera.main != null) Camera.main.gameObject.SetActive(false);
 
-        if (!hasSceneBeenLoadedOnce)
-        {
-            SceneManager.LoadScene(aquariumSceneName, LoadSceneMode.Additive);
-            hasSceneBeenLoadedOnce = true;
-        }
-        else
-        {
-            Toggle2DAquariumVisibility(true);
-        }
+        // Since it's pre-loaded in Start(), we just turn on its components!
+        Toggle2DAquariumVisibility(true);
 
         // UNLOCK MOUSE FOR TANK MENU NAVIGATING
         Cursor.lockState = CursorLockMode.None;
@@ -64,7 +73,7 @@ public class TankInteraction3D : MonoBehaviour
 
         if (localPlayer != null) localPlayer.SetPlayerLockState(false);
 
-        // Hide the 2D art assets from the 3D camera view while keeping scripts running!
+        // Hide the 2D art assets from the 3D camera view while keeping scripts running perfectly!
         Toggle2DAquariumVisibility(false);
 
         Camera playerCam = localPlayer.playerCamera.GetComponent<Camera>();
@@ -82,6 +91,13 @@ public class TankInteraction3D : MonoBehaviour
     {
         Scene aquariumScene = SceneManager.GetSceneByName(aquariumSceneName);
         if (!aquariumScene.isLoaded) return;
+
+        // Let the AquariumManager know if the tank is currently being viewed or background hidden
+        AquariumManager manager = FindFirstObjectByType<AquariumManager>();
+        if (manager != null)
+        {
+            manager.isTankVisible = makeVisible;
+        }
 
         GameObject[] rootObjects = aquariumScene.GetRootGameObjects();
         foreach (GameObject obj in rootObjects)

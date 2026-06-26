@@ -6,8 +6,18 @@ public class FishFood : MonoBehaviour
     public float floorYValue = -4.0f; 
     public float lifeTimeAfterFloor = 5.0f; 
 
-    // This flag tells the fish if another fish is already about to eat it
     [HideInInspector] public bool isTargeted = false;
+
+    // --- NEW: CHECK STATE AT BIRTH WORKFLOW ---
+    void Start()
+    {
+        AquariumManager manager = FindFirstObjectByType<AquariumManager>();
+        if (manager != null && !manager.isTankVisible)
+        {
+            SpriteRenderer sr = GetComponent<SpriteRenderer>();
+            if (sr != null) sr.enabled = false; // Spawns invisibly in the background
+        }
+    }
 
     void Update()
     {

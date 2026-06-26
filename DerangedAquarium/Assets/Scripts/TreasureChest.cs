@@ -52,13 +52,18 @@ public class TreasureChest : MonoBehaviour
         transform.localScale = originalScale * 0.9f; // Slight squish before the pop
         targetScale = originalScale * popScaleMultiplier; // Big expansion
 
+        // --- FETCH THE CORRECT BUBBLE CONTAINER TRANSFORM ---
+        AquariumManager manager = FindFirstObjectByType<AquariumManager>();
+        Transform container = (manager != null) ? manager.GetBubbleContainer() : null;
+
         // Spawn a small cluster of bubbles with slight horizontal offsets
         for (int i = 0; i < bubblesPerBurst; i++)
         {
             float randomXOffset = Random.Range(-burstSpreadWidth, burstSpreadWidth);
             Vector3 spawnPosition = new Vector3(transform.position.x + randomXOffset, transform.position.y + 0.3f, transform.position.z);
             
-            Instantiate(bubblePrefab, spawnPosition, Quaternion.identity);
+            // Instantiates safely parented inside the hierarchy tracker folder tree branch
+            Instantiate(bubblePrefab, spawnPosition, Quaternion.identity, container);
         }
     }
 }
