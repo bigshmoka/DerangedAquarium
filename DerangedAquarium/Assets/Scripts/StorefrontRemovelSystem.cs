@@ -9,12 +9,9 @@ public class StorefrontRemovalSystem : MonoBehaviour
     public KeyCode cancelHotkey = KeyCode.Escape;
 
     [Header("Hover Feedback Colors")]
-    [Tooltip("The color tint mixed onto the item when your crosshair focuses on it.")]
-    public Color hoverHighlightColor = new Color(1f, 0.3f, 0.3f, 1f); // Bright warning red tint
+    public Color hoverHighlightColor = new Color(1f, 0.3f, 0.3f, 1f); 
 
     private bool isRemovingMode = false;
-    
-    // --- NEW: VISUAL HOVER TRACKING STATE VARS ---
     private GameObject lastHoveredObject = null;
     private Dictionary<Renderer, Color[]> originalMaterialColors = new Dictionary<Renderer, Color[]>();
 
@@ -24,13 +21,11 @@ public class StorefrontRemovalSystem : MonoBehaviour
 
         HandleTargetScanning();
 
-        // Left-Click to permanently delete the targeted object
         if (Input.GetMouseButtonDown(0))
         {
             AttemptRemoveItem();
         }
 
-        // Right-Click or Escape to drop out of removal mode cleanly
         if (Input.GetMouseButtonDown(1) || Input.GetKeyDown(cancelHotkey))
         {
             ExitRemovalMode();
@@ -61,23 +56,18 @@ public class StorefrontRemovalSystem : MonoBehaviour
 
         GameObject currentlyPointedRoot = null;
 
-        // Perform raycast check from camera center POV crosshair straight ahead
         if (Physics.Raycast(cameraRay, out surfaceHit, maxRemovalDistance))
         {
             currentlyPointedRoot = FindPlacedRootObject(surfaceHit.collider.gameObject);
         }
 
-        // --- NEW: THE HOVER VISUAL STATES HIGHLIGHT ENGINE ---
-        // Case A: You shifted your crosshair to look at a completely different object
         if (currentlyPointedRoot != lastHoveredObject)
         {
-            // Wipe clean any highlights on the old item you walked away from
             if (lastHoveredObject != null)
             {
                 ClearTargetHighlightVisuals(lastHoveredObject);
             }
 
-            // Assign the new target and switch on its red selection overlay flash
             lastHoveredObject = currentlyPointedRoot;
 
             if (lastHoveredObject != null)
@@ -101,16 +91,12 @@ public class StorefrontRemovalSystem : MonoBehaviour
 
             for (int i = 0; i < runtimeSharedMats.Length; i++)
             {
-                // Cache your original color values safely before modifying them
                 if (runtimeSharedMats[i].HasProperty("_Color"))
                 {
                     savedBaseColors[i] = runtimeSharedMats[i].color;
-                    
-                    // Apply a striking reddish highlights overlay multiply tint
                     runtimeSharedMats[i].color = savedBaseColors[i] * hoverHighlightColor;
                 }
 
-                // Optional: Turn on an emission glow if the object's shader maps it
                 if (runtimeSharedMats[i].HasProperty("_EmissionColor"))
                 {
                     runtimeSharedMats[i].EnableKeyword("_EMISSION");
@@ -118,7 +104,6 @@ public class StorefrontRemovalSystem : MonoBehaviour
                 }
             }
 
-            // Lock values down into dictionary memory logs
             if (!originalMaterialColors.ContainsKey(rend))
             {
                 originalMaterialColors.Add(rend, savedBaseColors);
@@ -139,7 +124,6 @@ public class StorefrontRemovalSystem : MonoBehaviour
                 Material[] runtimeSharedMats = rend.materials;
                 for (int i = 0; i < runtimeSharedMats.Length && i < cachedColors.Length; i++)
                 {
-                    // Restore original flat look textures flawlessly
                     if (runtimeSharedMats[i].HasProperty("_Color"))
                     {
                         runtimeSharedMats[i].color = cachedColors[i];
@@ -168,9 +152,27 @@ public class StorefrontRemovalSystem : MonoBehaviour
             GameObject targetRoot = FindPlacedRootObject(surfaceHit.collider.gameObject);
             if (targetRoot != null)
             {
-                Debug.Log($"<color=red>[Removal Mode]</color> Successfully destroyed placed item asset: {targetRoot.name}");
+                // --- NEW: THE REFUND PROCESSING ENGINE ---
+                // Query the target item to see if it tracks an active price tag script component
+                PlacedItemData itemData = targetRoot.GetComponent<PlacedItemData>();
+                if (itemData != null && GlobalEconomyManager.Instance != null)
+                {
+                    // Calculate exactly 50% refund value (using integer division)
+                    int refundAmount = itemData.originalCost / 2;
+                    
+                    if (refundAmount > 0)
+                    {
+                        GlobalEconomyManager.Instance.AddMoney(refundAmount);
+                        Debug.Log($"<color=green>[Refund]</color> Item cost ${itemData.originalCost}. Refounded 50%: +${refundAmount} to your wallet.");
+                    }
+                }
+                else
+                {
+                    Debug.LogWarning("[Refund] This object did not track a PlacedItemData script component. Deleting with $0 refund.");
+                }
+
+                Debug.Log($"[Removal Mode] Successfully destroyed placed item asset: {targetRoot.name}");
                 
-                // Safety sequence cleanup: wipe cached highlights references immediately BEFORE deleting
                 originalMaterialColors.Clear();
                 lastHoveredObject = null;
 
@@ -197,7 +199,6 @@ public class StorefrontRemovalSystem : MonoBehaviour
     {
         if (!isRemovingMode) return;
 
-        // Restore textures instantly on whatever item you were staring at before quitting
         if (lastHoveredObject != null)
         {
             ClearTargetHighlightVisuals(lastHoveredObject);

@@ -2,28 +2,32 @@ using UnityEngine;
 
 public class ShopItemButton : MonoBehaviour
 {
-    // --- UPDATED: Added Item to the category list ---
     public enum ItemType { Decoration, Fish, Item }
 
-    [Header("Type Assignment")]
-    public ItemType itemCategory = ItemType.Decoration;
-
-    [Header("Item Settings")]
-    public GameObject itemPrefab;
-    public int itemCost = 50;
+    // --- UPDATED TO SCRIPTABLE OBJECT DATA TYPE ---
+    [Header("Data Profile Source")]
+    [Tooltip("Drag the matching AquariumItemData asset profile card from your project assets window here!")]
+    public AquariumItemData itemData;
 
     public void BuyThisItem()
     {
+        // Safety validation to prevent inspector layout assembly oversight errors
+        if (itemData == null)
+        {
+            Debug.LogError($"[Aquarium Shop] Button '{gameObject.name}' is missing an assigned AquariumItemData object profile asset source!", this);
+            return;
+        }
+
         // Locates the master manager in the current scene
         AquariumManager manager = FindFirstObjectByType<AquariumManager>();
         
         if (manager != null)
         {
             // 1. Check if it belongs to the Fish/Creature category
-            if (itemCategory == ItemType.Fish)
+            if (itemData.itemCategory == ItemType.Fish)
             {
                 // Unique Snail population limiter
-                if (itemPrefab != null && itemPrefab.name.Contains("Snail"))
+                if (itemData.itemPrefab != null && itemData.itemPrefab.name.Contains("Snail"))
                 {
                     // Scan the tank to see if a snail already exists
                     SnailAI existingSnail = FindFirstObjectByType<SnailAI>();
@@ -36,18 +40,18 @@ public class ShopItemButton : MonoBehaviour
                     }
                 }
 
-                // If the check passes (or it's just a normal fish), spawn it!
-                manager.BuyFishFromShop(itemPrefab, itemCost);
+                // If the check passes (or it's just a normal fish), spawn it using the data container profile attributes!
+                manager.BuyFishFromShop(itemData.itemPrefab, itemData.itemCost);
             }
-            // --- NEW: 2. Check if it belongs to the Item category (like the Automatic Feeder) ---
-            else if (itemCategory == ItemType.Item)
+            // 2. Check if it belongs to the Item category (like the Automatic Feeder)
+            else if (itemData.itemCategory == ItemType.Item)
             {
-                manager.SelectItemFromShop(itemPrefab, itemCost);
+                manager.SelectItemFromShop(itemData.itemPrefab, itemData.itemCost);
             }
             // 3. Run standard mouse-placement loop for decorations
             else 
             {
-                manager.SelectDecorationFromShop(itemPrefab, itemCost);
+                manager.SelectDecorationFromShop(itemData.itemPrefab, itemData.itemCost);
             }
         }
     }

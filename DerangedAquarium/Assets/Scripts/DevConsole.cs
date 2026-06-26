@@ -1,219 +1,176 @@
-using System;
-using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
-using UnityEngine.EventSystems; // Required namespace to handle duplicate UI engines
 
 public class DevConsole : MonoBehaviour
 {
-    [Header("UI Canvas References")]
-    public GameObject consoleCanvasWindow;    
-    public TMP_InputField commandInputField;  
+    [Header("Console UI References")]
+    public GameObject consolePanel;
+    public TMP_InputField commandInputField;
 
-    [Header("Console Toggle Hotkey")]
-    public KeyCode toggleKey = KeyCode.BackQuote; 
-
-    [Header("Registry of Spawnables")]
-    public List<GameObject> spawnablePrefabs = new List<GameObject>();
+    [Header("Console Toggle Key")]
+    public KeyCode toggleKey = KeyCode.BackQuote; // The tilde/backquote key (~)
 
     private bool isConsoleOpen = false;
-    private bool wasCursorUnlockedBeforeOpening = false;
-
-    private Dictionary<string, DevCommandBase> commandRegistry = new Dictionary<string, DevCommandBase>();
-
-    private DevCommand<int> addMoneyCommand;
-    private DevCommand<string> spawnPrefabCommand;
-    private DevCommand helpCommand;
-
-    void Awake()
-    {
-        // 1. The Money Code Command
-        addMoneyCommand = new DevCommand<int>("money", "Adds money directly to the aquarium balance wallet.", "money <amount>", (amount) =>
-        {
-            AquariumManager manager = FindFirstObjectByType<AquariumManager>();
-            if (manager != null)
-            {
-                manager.totalMoney += amount; 
-                Debug.Log($"<color=green>[DevConsole]</color> Successfully added ${amount} to local wallet.");
-            }
-            else
-            {
-                Debug.LogWarning("[DevConsole] Cannot add money: AquariumManager could not be located inside active scenes!");
-            }
-        });
-
-        // 2. The Prefab Spawner Command
-        spawnPrefabCommand = new DevCommand<string>("spawn", "Spawns a registered asset prefab at coordinates (0,0).", "spawn <prefabName>", (prefabName) =>
-        {
-            GameObject targetPrefab = spawnablePrefabs.Find(p => p != null && p.name.Equals(prefabName, StringComparison.OrdinalIgnoreCase));
-            
-            if (targetPrefab != null)
-            {
-                AquariumManager manager = FindFirstObjectByType<AquariumManager>();
-                if (manager != null)
-                {
-                    if (targetPrefab.GetComponent<NaturalFishAI>() != null)
-                    {
-                        manager.SpawnBabyFish(targetPrefab, Vector3.zero);
-                    }
-                    else
-                    {
-                        Instantiate(targetPrefab, Vector3.zero, Quaternion.identity, manager.transform);
-                    }
-                    Debug.Log($"<color=cyan>[DevConsole]</color> Spawned asset: {targetPrefab.name}");
-                }
-                else
-                {
-                    Debug.LogWarning("[DevConsole] Cannot spawn asset: AquariumManager could not be located inside active scenes!");
-                }
-            }
-            else
-            {
-                Debug.LogWarning($"[DevConsole] Prefab '{prefabName}' is missing from the DevConsole inspector array list!");
-            }
-        });
-
-        // 3. The Help Summary Command
-        helpCommand = new DevCommand("help", "Displays formatting instructions for all registered commands.", "help", () =>
-        {
-            Debug.Log("<color=yellow>--- CODES REGISTRY HELP LIST ---</color>");
-            foreach (var command in commandRegistry.Values)
-            {
-                Debug.Log($"<b>{command.CommandFormat}</b> — {command.CommandDescription}");
-            }
-        });
-
-        RegisterCommand(addMoneyCommand);
-        RegisterCommand(spawnPrefabCommand);
-        RegisterCommand(helpCommand);
-    }
 
     void Start()
     {
-        if (consoleCanvasWindow != null) consoleCanvasWindow.SetActive(false);
-        if (commandInputField != null)
+        if (consolePanel != null) consolePanel.SetActive(false);
+        
+        if (commandInputField != null) 
         {
-            commandInputField.onSubmit.AddListener(OnSubmitCommand);
-        }
+            commandInputField.DeactivateInputField();
 
-        // --- AUTOMATIC TWIN EVENT SYSTEM CLEANUP ---
-        // When the 2D Aquarium scene is loaded additively alongside your 3D Scene,
-        // Unity ends up with 2 active EventSystems (one from each canvas environment).
-        // This automatically finds duplicates, keeps the primary one active, and wipes the extra
-        // to completely eliminate the duplicate EventSystem warning logs.
-        EventSystem[] eventSystems = FindObjectsByType<EventSystem>(FindObjectsSortMode.None);
-        if (eventSystems.Length > 1)
-        {
-            for (int i = 1; i < eventSystems.Length; i++)
-            {
-                Destroy(eventSystems[i].gameObject);
-            }
+            // --- THE BULLETPROOF EVENT FIX ---
+            // We strip out manual Enter checks from Update and hook directly into TMPro's 
+            // native listener. This will catch the Enter key 100% of the time!
+            commandInputField.onSubmit.RemoveAllListeners();
+            commandInputField.onSubmit.AddListener(ProcessSubmittedText);
         }
     }
 
     void Update()
     {
+        // Toggle console with the tilde key (~)
         if (Input.GetKeyDown(toggleKey))
         {
             ToggleConsole();
         }
     }
 
-    public void RegisterCommand(DevCommandBase command)
-    {
-        if (!commandRegistry.ContainsKey(command.CommandId))
-        {
-            commandRegistry.Add(command.CommandId, command);
-        }
-    }
-
-    private void ToggleConsole()
+    public void ToggleConsole()
     {
         isConsoleOpen = !isConsoleOpen;
-        
-        if (consoleCanvasWindow != null) consoleCanvasWindow.SetActive(isConsoleOpen);
+
+        if (consolePanel != null)
+        {
+            consolePanel.SetActive(isConsoleOpen);
+        }
 
         PlayerController3D player = FindFirstObjectByType<PlayerController3D>();
 
         if (isConsoleOpen)
         {
-            wasCursorUnlockedBeforeOpening = (Cursor.lockState == CursorLockMode.None);
-
-            if (player != null)
-            {
-                player.SetPlayerLockState(true); 
-            }
-
             if (commandInputField != null)
             {
-                commandInputField.Select();
                 commandInputField.ActivateInputField();
-                commandInputField.text = "";
+                commandInputField.text = ""; 
+            }
+
+            if (player != null) player.SetPlayerLockState(true);
+            else
+            {
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
             }
         }
         else
         {
+            if (commandInputField != null) commandInputField.DeactivateInputField();
+
+            StorefrontShopUI storefrontShop = FindFirstObjectByType<StorefrontShopUI>();
             if (player != null)
             {
-                player.SetPlayerLockState(wasCursorUnlockedBeforeOpening);
-            }
-            else
-            {
-                Cursor.lockState = wasCursorUnlockedBeforeOpening ? CursorLockMode.None : CursorLockMode.Locked;
-                Cursor.visible = !wasCursorUnlockedBeforeOpening;
+                bool shouldKeepMouseUnlocked = (storefrontShop != null && storefrontShop.isShopOpen);
+                player.SetPlayerLockState(shouldKeepMouseUnlocked);
             }
         }
     }
 
-    private void OnSubmitCommand(string input)
+    private void ProcessSubmittedText(string rawInput)
     {
-        if (string.IsNullOrWhiteSpace(input)) return;
+        // Ignore empty submissions
+        if (string.IsNullOrEmpty(rawInput)) return;
 
-        string[] splitInput = input.Split(' ');
-        if (splitInput.Length == 0) return;
+        string cleanedInput = rawInput.Trim();
+        string[] inputPieces = cleanedInput.Split(' ');
 
-        string commandId = splitInput[0].ToLower();
+        if (inputPieces.Length == 0) return;
 
-        if (commandRegistry.ContainsKey(commandId))
+        string mainCommand = inputPieces[0].ToLower();
+        string commandArguments = inputPieces.Length > 1 ? inputPieces[1] : "";
+
+        switch (mainCommand)
         {
-            DevCommandBase baseCommand = commandRegistry[commandId];
+            case "money":
+                ExecuteMoneyCheat(commandArguments);
+                break;
 
-            if (baseCommand is DevCommand command)
+            case "spawnfish":
+                ExecuteSpawnFishCheat();
+                break;
+
+            case "clearitems":
+                ExecuteClearStorefrontItemsCheat();
+                break;
+
+            default:
+                Debug.LogWarning($"[Console] Unrecognized command code execution signature: '{mainCommand}'");
+                break;
+        }
+
+        // --- NEW: KEEP INPUT FOCUS COMFORTABLE ---
+        // If the console is still open, wipe the old text and keep the cursor flashing inside 
+        // the input field so you can rapidly type your next cheat command back-to-back!
+        if (isConsoleOpen && commandInputField != null)
+        {
+            commandInputField.text = "";
+            commandInputField.ActivateInputField();
+        }
+    }
+
+    private void ExecuteMoneyCheat(string argument)
+    {
+        if (int.TryParse(argument, out int moneyAmt))
+        {
+            if (GlobalEconomyManager.Instance != null)
             {
-                command.Invoke();
+                GlobalEconomyManager.Instance.AddMoney(moneyAmt);
+                Debug.Log($"<color=green>[Console] Cheat Success:</color> Deposited +${moneyAmt} into global central wallet authority ledger.");
             }
-            else if (baseCommand is DevCommand<int> intCommand)
+            else
             {
-                if (splitInput.Length > 1 && int.TryParse(splitInput[1], out int intArg))
-                {
-                    intCommand.Invoke(intArg);
-                }
-                else
-                {
-                    Debug.LogWarning($"[DevConsole] Typing formatting error. Usage: {baseCommand.CommandFormat}");
-                }
-            }
-            else if (baseCommand is DevCommand<string> stringCommand)
-            {
-                if (splitInput.Length > 1)
-                {
-                    stringCommand.Invoke(splitInput[1]);
-                }
-                else
-                {
-                    Debug.LogWarning($"[DevConsole] Typing formatting error. Usage: {baseCommand.CommandFormat}");
-                }
+                Debug.LogError("[Console] Error: GlobalEconomyManager instance could not be located.");
             }
         }
         else
         {
-            Debug.LogWarning($"[DevConsole] Code prefix '{commandId}' not found. Type 'help' to review syntax.");
+            Debug.LogWarning("[Console] Invalid syntax structure parameters. Expected: 'money <integer_amount>'");
         }
+    }
 
-        if (commandInputField != null)
+    private void ExecuteSpawnFishCheat()
+    {
+        AquariumManager currentActiveTankManager = FindFirstObjectByType<AquariumManager>();
+
+        if (currentActiveTankManager != null && currentActiveTankManager.fishPrefab != null)
         {
-            commandInputField.text = "";
-            commandInputField.ActivateInputField();
+            currentActiveTankManager.SpawnBabyFish(currentActiveTankManager.fishPrefab, Vector3.zero);
+            Debug.Log("<color=cyan>[Console]</color> Spawned extra cheat test fish directly at tank center origin point coordinates.");
+        }
+        else
+        {
+            Debug.LogWarning("[Console] Cannot process 'spawnfish' command. No active AquariumManager or fish prefab detected.");
+        }
+    }
+
+    private void ExecuteClearStorefrontItemsCheat()
+    {
+        GameObject placedContainer = GameObject.Find("--- PLACED 3D ITEMS ---");
+
+        if (placedContainer != null && placedContainer.transform.childCount > 0)
+        {
+            int structuralChildCount = placedContainer.transform.childCount;
+            
+            for (int i = structuralChildCount - 1; i >= 0; i--)
+            {
+                Destroy(placedContainer.transform.GetChild(i).gameObject);
+            }
+            
+            Debug.Log($"<color=red>[Console]</color> Swept and wiped clean all {structuralChildCount} active placed items.");
+        }
+        else
+        {
+            Debug.Log("[Console] Storefront items branch tree clean container node already stands completely empty.");
         }
     }
 }

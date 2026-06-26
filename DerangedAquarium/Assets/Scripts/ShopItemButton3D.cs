@@ -4,13 +4,9 @@ using TMPro;
 
 public class ShopItemButton3D : MonoBehaviour
 {
-    [Header("Item Sale Details")]
-    public string itemDisplayName = "Luxury Armchair";
-    public int itemCost = 120;
-
-    [Header("Target Prefab Asset")]
-    [Tooltip("Drag the raw 3D item prefab file straight from your project folders here (NOT a scene object!).")]
-    public GameObject itemPrefab;
+    [Header("Data Profile Source")]
+    [Tooltip("Drag the matching StorefrontItemData asset profile card from your project assets window here!")]
+    public StorefrontItemData itemData;
 
     [Header("Internal UI Components")]
     public TMP_Text costDisplayText;
@@ -20,9 +16,16 @@ public class ShopItemButton3D : MonoBehaviour
     {
         itemBuyButton = GetComponent<Button>();
 
+        if (itemData == null)
+        {
+            Debug.LogError($"[3D Shop] Button '{gameObject.name}' is missing an assigned StorefrontItemData object profile asset source!", this);
+            return;
+        }
+
+        // Automatically format and display the price tag dynamically from the ScriptableObject file
         if (costDisplayText != null)
         {
-            costDisplayText.text = $"{itemDisplayName}\n${itemCost}";
+            costDisplayText.text = $"{itemData.itemDisplayName}\n${itemData.itemCost}";
         }
 
         if (itemBuyButton != null)
@@ -33,13 +36,13 @@ public class ShopItemButton3D : MonoBehaviour
 
     void LaunchStorefrontPlacement()
     {
-        if (itemPrefab == null) return;
+        if (itemData == null || itemData.itemPrefab == null) return;
 
         StorefrontPlacementSystem placementSystem = FindFirstObjectByType<StorefrontPlacementSystem>();
         if (placementSystem != null)
         {
-            // Hands off the asset file data to trigger ghost preview tracking loops cleanly
-            placementSystem.StartPlacement(itemPrefab, itemCost);
+            // Hands off the raw prefab file asset and price point data straight from the profile card!
+            placementSystem.StartPlacement(itemData.itemPrefab, itemData.itemCost);
         }
         else
         {

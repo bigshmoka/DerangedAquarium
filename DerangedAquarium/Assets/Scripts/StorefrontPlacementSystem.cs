@@ -40,8 +40,6 @@ public class StorefrontPlacementSystem : MonoBehaviour
     {
         if (prefab == null) return;
 
-        // --- NEW: AUTO-CANCEL DECONSTRUCTION ON PLACEMENT ---
-        // Ensure any running removal loops are turned off before entering placement mode
         StorefrontRemovalSystem removalSystem = FindFirstObjectByType<StorefrontRemovalSystem>();
         if (removalSystem != null)
         {
@@ -139,9 +137,12 @@ public class StorefrontPlacementSystem : MonoBehaviour
             }
 
             GameObject placedObject = Instantiate(selectedPrefab, ghostPreviewInstance.transform.position, ghostPreviewInstance.transform.rotation, activeParentContainer);
-            
-            // Critical Identifier: StorefrontRemovalSystem looks for this specific name suffix to target items!
             placedObject.name = selectedPrefab.name + "_Placed";
+
+            // --- NEW: THE PRICE STAMP ENGINE ---
+            // Attaches the PlacedItemData script to the object instance and saves its buy cost
+            PlacedItemData itemData = placedObject.AddComponent<PlacedItemData>();
+            itemData.originalCost = currentItemCost;
 
             EndPlacementWorkflow();
         }

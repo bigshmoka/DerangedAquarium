@@ -602,9 +602,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9376029ce151f08419ca21ddf5b30be0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ShopItemButton
-  itemCategory: 0
-  itemPrefab: {fileID: 183678643297892167, guid: bc6f6dad15e44a24c8a050b04d2fd86c, type: 3}
-  itemCost: 50
+  itemData: {fileID: 11400000, guid: 73115323839ede240af97fc847b939bc, type: 2}
 --- !u!1 &527231468
 GameObject:
   m_ObjectHideFlags: 0
@@ -1100,9 +1098,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9376029ce151f08419ca21ddf5b30be0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ShopItemButton
-  itemCategory: 2
-  itemPrefab: {fileID: 3883170469595426692, guid: c65ea7bff409d66498b11d2f3249ebba, type: 3}
-  itemCost: 450
+  itemData: {fileID: 11400000, guid: fdd5bf664ef85994fba4de63e462ee10, type: 2}
 --- !u!114 &651911645
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1388,9 +1384,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9376029ce151f08419ca21ddf5b30be0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ShopItemButton
-  itemCategory: 1
-  itemPrefab: {fileID: 389567483668719346, guid: 67068a56bb7909c469e67c79b4d1045b, type: 3}
-  itemCost: 150
+  itemData: {fileID: 11400000, guid: bec52c5e769e658458160ab691b112a6, type: 2}
 --- !u!114 &750212902
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3358,9 +3352,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9376029ce151f08419ca21ddf5b30be0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ShopItemButton
-  itemCategory: 1
-  itemPrefab: {fileID: 8356636756481863449, guid: 42a4a883784d75d4d9f0dbbbcea45c2c, type: 3}
-  itemCost: 50
+  itemData: {fileID: 11400000, guid: a2db92594e6b5014c9f2d9be80412b28, type: 2}
 --- !u!114 &1650895939
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3569,9 +3561,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9376029ce151f08419ca21ddf5b30be0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ShopItemButton
-  itemCategory: 2
-  itemPrefab: {fileID: 1714635856305122554, guid: 903eebd7aa2edb7419f7924aef02cbef, type: 3}
-  itemCost: 200
+  itemData: {fileID: 11400000, guid: 200b9bbdfa0aa30499651c369e04aefd, type: 2}
 --- !u!114 &1699069671
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4542,9 +4532,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9376029ce151f08419ca21ddf5b30be0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ShopItemButton
-  itemCategory: 1
-  itemPrefab: {fileID: 389567483668719346, guid: bcf1f809926ea2547ac33c3356d1f5dd, type: 3}
-  itemCost: 50
+  itemData: {fileID: 11400000, guid: bceaa38874dc04045bc96a8c65686820, type: 2}
 --- !u!114 &1943796341
 MonoBehaviour:
   m_ObjectHideFlags: 0
