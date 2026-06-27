@@ -51,6 +51,10 @@ public class DevConsole : MonoBehaviour
 
             InitializeBaseCommands();
             ScanAndCacheAllGamePrefabs();
+            
+            // --- FIXED: SORT THE LIST ALPHABETICALLY TO PRIORITIZE ROOT WORDS ---
+            autocompleteList.Sort();
+            
             CreateGhostTextOverlay();
         }
 
@@ -170,13 +174,12 @@ public class DevConsole : MonoBehaviour
             }
         }
 
-        // --- FIXED: MULTI-TAP UP ARROW COMMAND HISTORY RECALL ---
+        // --- FIXED: CLEAN ERROR-FREE COMMAND HISTORY RECALL ---
         if (Input.GetKeyDown(KeyCode.UpArrow) && commandHistory.Count > 0)
         {
             historyIndex--;
             if (historyIndex < 0) historyIndex = 0; 
 
-            // Cleared out the broken duplication line completely
             commandInputField.text = commandHistory[historyIndex];
             commandInputField.caretPosition = commandInputField.text.Length;
             commandInputField.ActivateInputField();
