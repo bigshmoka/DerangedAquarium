@@ -22,6 +22,12 @@ public class MoneyPopEffect : MonoBehaviour
     private Color originalTextColor;
     private Coroutine activePopCoroutine;
 
+    // --- ANIMATION SHIELD TRACKERS ---
+    private bool isAnimating = false;
+    private float currentSizePercent = 100f;
+    private Color currentFrameColor;
+    private int snapshotBalance = 0;
+
     void Awake()
     {
         textMesh = GetComponent<TMP_Text>();
@@ -51,12 +57,23 @@ public class MoneyPopEffect : MonoBehaviour
     {
         if (textMesh == null) return;
 
-        // If an animation loop is already running, safely stop it first to prevent overlapping glitches
+        // Take a clean snapshot of the wallet balance right as the quest completes
+        if (GlobalEconomyManager.Instance != null)
+        {
+            snapshotBalance = GlobalEconomyManager.Instance.GetBalance();
+        }
+        else
+        {
+            snapshotBalance = 100;
+        }
+
+        // If an animation loop is already running, safely stop it first to reset timers cleanly
         if (activePopCoroutine != null)
         {
             StopCoroutine(activePopCoroutine);
         }
         
+        isAnimating = true;
         activePopCoroutine = StartCoroutine(AnimatePopAndColorSequence());
     }
 
@@ -71,15 +88,14 @@ public class MoneyPopEffect : MonoBehaviour
             elapsed += Time.deltaTime;
             float progress = elapsed / growDuration;
 
-            // Calculate the growing font percentage size smoothly
-            float currentSizePercent = Mathf.Lerp(100f, maxSizePercent, progress);
-
-            // Reconstruct the text safely using live values
-            UpdateMoneyTextWithEffects(currentSizePercent, numbersFlashColor);
+            // Calculate state targets for the LateUpdate text renderer
+            currentSizePercent = Mathf.Lerp(100f, maxSizePercent, progress);
+            currentFrameColor = numbersFlashColor;
 
             yield return null;
         }
-        UpdateMoneyTextWithEffects(maxSizePercent, numbersFlashColor);
+        currentSizePercent = maxSizePercent;
+        currentFrameColor = numbersFlashColor;
 
         // --- STAGE 2: THE HOLD / LINGER WINDOW ---
         // Keeps the numbers hanging at max size and maximum green brightness for half a second
@@ -93,12 +109,10 @@ public class MoneyPopEffect : MonoBehaviour
             float progress = elapsed / shrinkDuration;
 
             // Interpolate sizing tags down from expanded threshold back to base 100%
-            float currentSizePercent = Mathf.Lerp(maxSizePercent, 100f, progress);
+            currentSizePercent = Mathf.Lerp(maxSizePercent, 100f, progress);
 
             // Interpolate color values back to native text layout settings
-            Color currentFrameColor = Color.Lerp(numbersFlashColor, originalTextColor, progress);
-            
-            UpdateMoneyTextWithEffects(currentSizePercent, currentFrameColor);
+            currentFrameColor = Color.Lerp(numbersFlashColor, originalTextColor, progress);
 
             yield return null;
         }
@@ -107,32 +121,30 @@ public class MoneyPopEffect : MonoBehaviour
         RestoreCleanText();
     }
 
-    private void UpdateMoneyTextWithEffects(float sizePercent, Color targetColor)
+    // LateUpdate executes AFTER all standard updates, physics, and coin pickups have processed.
+    // This allows us to overwrite any accidental text changes before the frame is drawn on screen!
+    void LateUpdate()
     {
-        if (textMesh == null) return;
+        if (!isAnimating || textMesh == null) return;
 
-        // Fetch the up-to-the-millisecond accurate balance directly from your global wallet singleton
-        int currentBalance = 100;
-        if (GlobalEconomyManager.Instance != null)
-        {
-            currentBalance = GlobalEconomyManager.Instance.GetBalance();
-        }
+        // Convert the current frame's animated color into a clean hex string
+        string hexColorCode = ColorUtility.ToHtmlStringRGB(currentFrameColor);
 
-        // Convert the color structure into a clean hexadecimal string
-        string hexColorCode = ColorUtility.ToHtmlStringRGB(targetColor);
-
-        // BULLETPROOF RECONSTRUCTION: "Money: $" is written completely raw outside of the tags!
-        // The sizing and coloring tags wrap ONLY the numeric balance integers.
-        textMesh.text = $"Money: $<size={sizePercent:F0}%><color=#{hexColorCode}>{currentBalance}</color></size>";
+        // Enforce the visual shield: "Money: $" is written raw outside the tags, locked in place.
+        // The sizing and coloring tags wrap ONLY our static quest-reward snapshot balance integer.
+        textMesh.text = $"Money: $<size={currentSizePercent:F0}%><color=#{hexColorCode}>{snapshotBalance}</color></size>";
     }
 
     private void RestoreCleanText()
     {
+        isAnimating = false;
+
         if (textMesh == null) return;
 
-        // Hard reset to a pristine, un-tagged string layout matching your default setup
-        int currentBalance = GlobalEconomyManager.Instance != null ? GlobalEconomyManager.Instance.GetBalance() : 100;
-        textMesh.text = "Money: $" + currentBalance;
+        // Drop the shield and hard-reset the text to your absolute true current wallet balance
+        // (This seamlessly catches and displays any coins picked up during the animation window!)
+        int trueBalance = GlobalEconomyManager.Instance != null ? GlobalEconomyManager.Instance.GetBalance() : 100;
+        textMesh.text = "Money: $" + trueBalance;
         
         activePopCoroutine = null;
     }
