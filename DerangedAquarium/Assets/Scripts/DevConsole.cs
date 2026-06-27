@@ -117,16 +117,12 @@ public class DevConsole : MonoBehaviour
                             currentCheckNode = currentCheckNode.parent;
                         }
 
-                        // --- FIXED: DUAL-LAYER STRUCTURAL FILTERS ---
-                        // Extract lower-case strings to make the matching process case-insensitive
                         string spriteNameLower = sprite.gameObject.name.ToLower();
                         string rootNameLower = currentCheckNode.gameObject.name.ToLower();
 
-                        // Identify background structural keywords
                         bool isAlgaeGrid = currentCheckNode.GetComponent<AlgaeNode>() != null || rootNameLower.Contains("algae");
                         bool isCoreEngine = rootNameLower.Contains("manager") || rootNameLower.Contains("camera") || rootNameLower.Contains("canvas");
                         
-                        // Protects background, backdrop image maps, tank wall lines, and glass borders
                         bool isBackgroundPrefab = spriteNameLower.Contains("background") || rootNameLower.Contains("background") ||
                                                   spriteNameLower.Contains("backdrop")   || rootNameLower.Contains("backdrop")   ||
                                                   spriteNameLower.Contains("glass")      || rootNameLower.Contains("glass")      ||
@@ -135,7 +131,7 @@ public class DevConsole : MonoBehaviour
 
                         if (isAlgaeGrid || isCoreEngine || isBackgroundPrefab)
                         {
-                            continue; // Safely bypass this object layout and protect it from destruction
+                            continue; 
                         }
 
                         closestDistanceFound = currentDistance;
@@ -169,17 +165,18 @@ public class DevConsole : MonoBehaviour
                 commandInputField.caretPosition = filledCommand.Length;
                 commandInputField.ActivateInputField();
 
-                if (ghostTextMesh != null) ghostTextMesh.text = "";
                 currentSuggestion = "";
+                OnInputValueChanged(filledCommand);
             }
         }
 
-        // MULTI-TAP UP ARROW COMMAND HISTORY RECALL
+        // --- FIXED: MULTI-TAP UP ARROW COMMAND HISTORY RECALL ---
         if (Input.GetKeyDown(KeyCode.UpArrow) && commandHistory.Count > 0)
         {
             historyIndex--;
             if (historyIndex < 0) historyIndex = 0; 
 
+            // Cleared out the broken duplication line completely
             commandInputField.text = commandHistory[historyIndex];
             commandInputField.caretPosition = commandInputField.text.Length;
             commandInputField.ActivateInputField();
@@ -219,6 +216,8 @@ public class DevConsole : MonoBehaviour
         autocompleteList.Add("load");
         autocompleteList.Add("spawn");
         autocompleteList.Add("delete");
+        autocompleteList.Add("clear");
+        autocompleteList.Add("cls");
     }
 
     private void ScanAndCacheAllGamePrefabs()
@@ -283,7 +282,7 @@ public class DevConsole : MonoBehaviour
         ghostTextMesh.alignment = mainTextComponent.alignment;
         ghostTextMesh.margin = mainTextComponent.margin;
 
-        ghostTextMesh.color = new Color(0.6f, 0.6f, 0.6f, 0.45f); 
+        ghostTextMesh.color = new Color(1f, 1f, 1f, 0.35f); 
         ghostTextMesh.raycastTarget = false; 
 
         RectTransform ghostRect = ghostObj.GetComponent<RectTransform>();
@@ -312,12 +311,46 @@ public class DevConsole : MonoBehaviour
             return;
         }
 
+        string lowerInput = currentInput.ToLower();
+
+        if (lowerInput == "money" || lowerInput == "money ")
+        {
+            string spacingBuffer = lowerInput == "money" ? " " : "";
+            if (ghostTextMesh != null) ghostTextMesh.text = currentInput + spacingBuffer + "<color=#55FF55>[amount]</color>";
+            return;
+        }
+        if (lowerInput == "spawn" || lowerInput == "spawn ")
+        {
+            string spacingBuffer = lowerInput == "spawn" ? " " : "";
+            if (ghostTextMesh != null) ghostTextMesh.text = currentInput + spacingBuffer + "<color=#33CCFF>[asset_name]</color>";
+            return;
+        }
+        if (lowerInput == "timescale" || lowerInput == "timescale ")
+        {
+            string spacingBuffer = lowerInput == "timescale" ? " " : "";
+            if (ghostTextMesh != null) ghostTextMesh.text = currentInput + spacingBuffer + "<color=#FFCC00>[multiplier]</color>";
+            return;
+        }
+
         foreach (string command in autocompleteList)
         {
-            if (command.StartsWith(currentInput.ToLower()))
+            if (command.StartsWith(lowerInput))
             {
                 currentSuggestion = command;
                 break;
+            }
+        }
+
+        if (!string.IsNullOrEmpty(currentSuggestion) && ghostTextMesh != null)
+        {
+            if (currentSuggestion.Length > currentInput.Length)
+            {
+                string hiddenSuffix = currentSuggestion.Substring(currentInput.Length);
+                ghostTextMesh.text = currentInput + hiddenSuffix;
+            }
+            else
+            {
+                ghostTextMesh.text = ""; 
             }
         }
     }
@@ -436,6 +469,12 @@ public class DevConsole : MonoBehaviour
                 ExecuteHelpCommand();
                 break;
 
+            case "clear":
+            case "cls":
+                if (logDisplayText != null) logDisplayText.text = "";
+                Debug.Log("[Console] Log screen cleared successfully.");
+                break;
+
             case "noclip":
                 ExecuteNoclipCommand();
                 break;
@@ -496,6 +535,7 @@ public class DevConsole : MonoBehaviour
     {
         Debug.Log("<b>=== DEV CONSOLE HELP REGISTRY ===</b>\n" +
                   "• <b>help</b> - Displays this active cheat command overview panel.\n" +
+                  "• <b>clear / cls</b> - Instantly wipes all previous console messages and clears the view.\n" +
                   "• <b>noclip</b> - Toggles fly mode to pass through wall meshes and move out-of-bounds.\n" +
                   "• <b>timescale <float></b> - Adjusts simulation flow speed (e.g., 'timescale 4' speeds up growth and algae cycles).\n" +
                   "• <b>clearalgae</b> - Instantly clears away all green algae from every window node pane in the tank.\n" +
