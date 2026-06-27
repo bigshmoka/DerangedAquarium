@@ -53,6 +53,7 @@ public class AlgaeNode : MonoBehaviour
 
             UpdateVisuals();
             Debug.Log(gameObject.name + " scrubbed via hover! Current Algae: " + currentAlgaeLevel);
+            QuestManager.Instance.ProgressQuest("clean_algae", 1);
         }
     }
 

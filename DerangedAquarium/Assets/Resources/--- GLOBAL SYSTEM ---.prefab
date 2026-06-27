@@ -91,6 +91,31 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 205935a19f821c44aab3ec8b1188aa98, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::QuestManager
+  masterQuestChain:
+  - questID: feed_fish
+    description: Get familiar with your tank (feed 3 fish)
+    targetCount: 3
+    cashReward: 300
+    currentCount: 0
+    isCompleted: 0
+  - questID: buy_creatures
+    description: buy another fish!
+    targetCount: 1
+    cashReward: 400
+    currentCount: 0
+    isCompleted: 0
+  - questID: place_decor
+    description: Place a sofa in your store
+    targetCount: 1
+    cashReward: 500
+    currentCount: 0
+    isCompleted: 0
+  - questID: clean_algae
+    description: clean off the algae on the tank three times!
+    targetCount: 3
+    cashReward: 400
+    currentCount: 0
+    isCompleted: 0
   activeQuests: []
 --- !u!1 &2741522133616320174
 GameObject:

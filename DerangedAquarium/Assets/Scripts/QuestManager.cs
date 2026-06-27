@@ -4,106 +4,94 @@ using System.Collections.Generic;
 [System.Serializable]
 public class Quest
 {
-    public string questID;         // Maps to triggers: "feed_fish", "buy_creatures", "place_decor"
+    [Header("Quest Configuration")]
+    [Tooltip("Core key identifier linking to code event triggers ('feed_fish', 'buy_creatures', 'place_decor').")]
+    public string questID;         
+    [Tooltip("The objective text printed directly to the developer logs and menus.")]
     public string description;     
+    [Tooltip("The completion threshold quota target value.")]
     public int targetCount;        
-    public int currentCount;       
+    [Tooltip("The balance ledger cash payout dropped upon passing the milestone target.")]
     public int cashReward;         
-    public bool isCompleted;
-}
 
-[System.Serializable]
-public class QuestTemplate
-{
-    public string questID;
-    public string descriptionTemplate; // e.g., "Feed fish {0} times"
-    public int baseTargetCount;
-    public int baseCashReward;
+    [Header("Live Progress (Read-Only During Play Mode)")]
+    [Tooltip("Live runtime count tracking how many tasks have been successfully processed.")]
+    public int currentCount; 
+    [Tooltip("Live tracking flag displaying whether this individual quest chapter has been passed.")]
+    public bool isCompleted; 
 }
 
 public class QuestManager : MonoBehaviour
 {
     public static QuestManager Instance;
 
-    [Header("Quest Configuration")]
-    public int maxActiveQuests = 3;
-    [Tooltip("Length of an in-game day cycle tracked in real-world seconds (86400s = 24 hours).")]
-    public float dayDurationInSeconds = 86400f; 
+    [Header("Campaign Storyline Chain")]
+    [Tooltip("Design your sequential timeline of story milestones here! Drag, drop, add, or delete elements directly inside the editor.")]
+    public List<Quest> masterQuestChain = new List<Quest>();
 
+    [Header("Runtime Status Tracking")]
+    [Tooltip("The single quest currently active and presented to the player.")]
     public List<Quest> activeQuests = new List<Quest>();
-    private List<QuestTemplate> questPool = new List<QuestTemplate>();
 
-    private float dayTimer = 0f;
+    private int currentChainIndex = 0;
 
     void Awake()
     {
         if (Instance == null) Instance = this;
         else Destroy(gameObject);
         
-        // --- FIXED: THE PROGRAMMATIC OVERRIDE SHIELD ---
-        // This forces 24 hours in pure code, breaking Unity's Inspector serialization lock automatically!
-        dayDurationInSeconds = 86400f;
-
-        InitializeQuestPool();
-        GenerateNewDailyQuests();
-        dayTimer = dayDurationInSeconds;
-    }
-
-    void Update()
-    {
-        // Automatically counts down and natively respects the dev console's timescale cheat!
-        dayTimer -= Time.deltaTime;
-        if (dayTimer <= 0f)
+        // SAFE INSPECTOR INTEGRATION SHIELD
+        if (masterQuestChain == null || masterQuestChain.Count == 0)
         {
-            RotateDailyQuests();
+            InitializeDefaultCampaignChain();
         }
+
+        LoadCurrentQuestFromChain();
     }
 
-    void InitializeQuestPool()
+    void InitializeDefaultCampaignChain()
     {
-        questPool.Clear();
-        questPool.Add(new QuestTemplate { questID = "feed_fish", descriptionTemplate = "Feed fish {0} times", baseTargetCount = 10, baseCashReward = 500 });
-        questPool.Add(new QuestTemplate { questID = "buy_creatures", descriptionTemplate = "Buy {0} new aquatic creatures", baseTargetCount = 3, baseCashReward = 1500 });
-        questPool.Add(new QuestTemplate { questID = "place_decor", descriptionTemplate = "Place {0} item or room decoration", baseTargetCount = 1, baseCashReward = 1000 });
-        questPool.Add(new QuestTemplate { questID = "feed_fish", descriptionTemplate = "Feed fish a massive feast ({0} times)", baseTargetCount = 20, baseCashReward = 1200 });
-        questPool.Add(new QuestTemplate { questID = "place_decor", descriptionTemplate = "Re-decorate your storefront layout ({0} furniture pieces)", baseTargetCount = 3, baseCashReward = 2500 });
+        masterQuestChain.Clear();
+
+        // Stage 1: The Basics (Aquarium Introduction)
+        masterQuestChain.Add(new Quest { questID = "feed_fish", description = "Get familiar with your tank (Feed fish 3 times)", targetCount = 3, cashReward = 300 });
+        masterQuestChain.Add(new Quest { questID = "buy_creatures", description = "Expand your collection (Buy your first new creature)", targetCount = 1, cashReward = 600 });
+        
+        // Stage 2: Storefront Presentation (3D Interior Integration)
+        masterQuestChain.Add(new Quest { questID = "place_decor", description = "Welcome your guests (Place a piece of shop furniture)", targetCount = 1, cashReward = 1000 });
+        masterQuestChain.Add(new Quest { questID = "feed_fish", description = "Maintain a healthy routine (Feed fish 15 times)", targetCount = 15, cashReward = 1200 });
+        
+        // Stage 3: Tycoon Scaling (Advanced Management Milestone)
+        masterQuestChain.Add(new Quest { questID = "buy_creatures", description = "Populate your showroom displays (Purchase 3 more creatures)", targetCount = 3, cashReward = 2500 });
+        masterQuestChain.Add(new Quest { questID = "place_decor", description = "Expand shop appeal layouts (Place 3 decorations)", targetCount = 3, cashReward = 3000 });
     }
 
-    public void RotateDailyQuests()
-    {
-        Debug.Log("<color=yellow>[Quest Rotation]</color> A new day has arrived! Clearing and rotating daily quest lists...");
-        GenerateNewDailyQuests();
-        dayTimer = dayDurationInSeconds;
-    }
-
-    void GenerateNewDailyQuests()
+    void LoadCurrentQuestFromChain()
     {
         activeQuests.Clear();
-        
-        // Copy our core templates so we can track and shift out values
-        List<QuestTemplate> samplePool = new List<QuestTemplate>(questPool);
-        
-        for (int i = 0; i < maxActiveQuests; i++)
-        {
-            if (samplePool.Count == 0) break;
-            
-            int randomIndex = Random.Range(0, samplePool.Count);
-            QuestTemplate template = samplePool[randomIndex];
-            
-            // Shifting the selected template out of the copy pool prevents duplicate quest types simultaneously
-            samplePool.RemoveAt(randomIndex); 
 
-            Quest newQuest = new Quest
-            {
-                questID = template.questID,
-                description = string.Format(template.descriptionTemplate, template.baseTargetCount),
-                targetCount = template.baseTargetCount,
-                currentCount = 0,
-                cashReward = template.baseCashReward,
-                isCompleted = false
+        if (currentChainIndex < masterQuestChain.Count)
+        {
+            // Reset state trackers on load to wipe residual inspector initialization remnants
+            masterQuestChain[currentChainIndex].currentCount = 0;
+            masterQuestChain[currentChainIndex].isCompleted = false;
+
+            // Pull the exact current milestone out of our sequential timeline index row
+            activeQuests.Add(masterQuestChain[currentChainIndex]);
+            Debug.Log($"<color=cyan>[Quest Chain]</color> Active Story Objective Updated: {masterQuestChain[currentChainIndex].description}");
+        }
+        else
+        {
+            // Campaign Epilogue Fallback State if a player beats all your built levels
+            Quest sandboxQuest = new Quest 
+            { 
+                questID = "completed", 
+                description = "All story chapters completed! Enjoy your Sandbox Aquarium.", 
+                targetCount = 9999, 
+                cashReward = 0
             };
-            
-            activeQuests.Add(newQuest);
+            sandboxQuest.isCompleted = true;
+            activeQuests.Add(sandboxQuest);
         }
     }
 
@@ -119,6 +107,8 @@ public class QuestManager : MonoBehaviour
                 if (q.currentCount >= q.targetCount)
                 {
                     CompleteQuest(q);
+                    // Break out of the loop instantly so we don't evaluate a collection that was just modified by LoadCurrentQuestFromChain!
+                    break; 
                 }
             }
         }
@@ -134,17 +124,27 @@ public class QuestManager : MonoBehaviour
             GlobalEconomyManager.Instance.AddMoney(q.cashReward);
             Debug.Log($"[Quest Reward] +${q.cashReward} deposited.");
         }
+
+        // ADVANCE THE TIMELINE INDEX ROW AND POP THE NEXT OBJECTIVE INSTANTLY
+        currentChainIndex++;
+        LoadCurrentQuestFromChain();
     }
 
-    // Exposed math method allowing the developer console panel to pull formatting numbers
+    // This allows your developer console's 'skipday' command to act as an instant skip tool!
+    public void RotateDailyQuests()
+    {
+        if (currentChainIndex < masterQuestChain.Count)
+        {
+            Debug.Log($"<color=orange>[Dev Tooling]</color> Force-skipping campaign quest chapter: '{masterQuestChain[currentChainIndex].description}'");
+            currentChainIndex++;
+            LoadCurrentQuestFromChain();
+        }
+    }
+
+    // Repurposed string handler prevents your console screen UI code from throwing script reference errors
     public string GetTimeRemainingString()
     {
-        if (dayTimer < 0f) return "00h 00m 00s";
-        
-        int hours = Mathf.FloorToInt(dayTimer / 3600f);
-        int minutes = Mathf.FloorToInt((dayTimer % 3600f) / 60f);
-        int seconds = Mathf.FloorToInt(dayTimer % 60f);
-        
-        return string.Format("{0:00}h {1:00}m {2:00}s", hours, minutes, seconds);
+        if (currentChainIndex >= masterQuestChain.Count) return "CAMPAIGN COMPLETED";
+        return $"Chapter {currentChainIndex + 1} / {masterQuestChain.Count}";
     }
 }
