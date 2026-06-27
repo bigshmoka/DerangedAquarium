@@ -215,7 +215,6 @@ public class DevConsole : MonoBehaviour
         autocompleteList.Add("growlagae");
         autocompleteList.Add("money");
         autocompleteList.Add("clearitems");
-        // --- INTEGRATED: NEW 2D BULK CLEANER REGISTRY KEY ---
         autocompleteList.Add("clearitems2d");
         autocompleteList.Add("save");
         autocompleteList.Add("load");
@@ -528,7 +527,6 @@ public class DevConsole : MonoBehaviour
                 ExecuteClearStorefrontItemsCheat();
                 break;
 
-            // --- INTEGRATED: REDIRECT INCOMING ROUTING TOKEN ---
             case "clearitems2d":
                 ExecuteClear2DItemsCheat();
                 break;
@@ -842,21 +840,25 @@ public class DevConsole : MonoBehaviour
         }
     }
 
+    // --- UPGRADED: THE 3D PLACED SHOP UTILITIES PURGE CLEANER ---
     private void ExecuteClearStorefrontItemsCheat()
     {
         GameObject KaplanContainer = GameObject.Find("--- PLACED 3D ITEMS ---");
-        if (KaplanContainer != null && KaplanContainer.transform.childCount > 0)
+        int objectsPurgedCount = 0;
+
+        if (KaplanContainer != null)
         {
-            int structuralChildCount = KaplanContainer.transform.childCount;
-            for (int i = structuralChildCount - 1; i >= 0; i--)
+            objectsPurgedCount = KaplanContainer.transform.childCount;
+            for (int i = objectsPurgedCount - 1; i >= 0; i--)
             {
                 Destroy(KaplanContainer.transform.GetChild(i).gameObject);
             }
-            Debug.Log($"[Janitor Sweep] Swept and wiped clean all {structuralChildCount} active placed items.");
         }
+
+        // FIXED: Now displays exact matching style formatting feedback as the 2D sweep command!
+        Debug.Log($"<color=green>[Janitor Sweep 3D]</color> Vaporized <b>{objectsPurgedCount}</b> active placed items from the storefront showroom.");
     }
 
-    // --- NEW: THE 2D BULK TANK UTILITIES PURGE CLEANER ---
     private void ExecuteClear2DItemsCheat()
     {
         AquariumManager tankManager = FindFirstObjectByType<AquariumManager>();
@@ -868,19 +870,14 @@ public class DevConsole : MonoBehaviour
 
         int objectsPurgedCount = 0;
 
-        // Loop backward through the direct hierarchy children tree branch of the 2D manager to avoid index skips
         for (int i = tankManager.transform.childCount - 1; i >= 0; i--)
         {
             Transform childNode = tankManager.transform.GetChild(i);
 
-            // CRITICAL SANITY FILTER SHIELDS: Ensure we do NOT vaporize living creature mechanics!
             bool isFishEntity = childNode.GetComponent<NaturalFishAI>() != null || childNode.name.ToLower().Contains("fish");
             bool isSnailEntity = childNode.GetComponent<SnailAI>() != null || childNode.name.ToLower().Contains("snail");
-            
-            // Protect structural system folder paths (like your runtime food/bubble container parent objects)
             bool isSystemFolder = childNode.name.Contains("---");
 
-            // Isolate Target Classes: Clear out automated mechanics, decorations, or shop placement profiles
             bool isTargetUtilityItem = childNode.GetComponent<AutoFeeder>() != null ||
                                        childNode.GetComponent<TreasureChest>() != null ||
                                        childNode.GetComponent<LivePlant>() != null ||
