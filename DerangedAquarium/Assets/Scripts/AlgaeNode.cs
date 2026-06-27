@@ -38,7 +38,7 @@ public class AlgaeNode : MonoBehaviour
         UpdateVisuals();
     }
 
-    // --- NEW: NO-CLICK HOVER WIPING ---
+    // --- NO-CLICK HOVER WIPING ---
     // This triggers the EXACT instant the mouse cursor crosses into the wall's collider box
     void OnMouseEnter()
     {
@@ -47,13 +47,24 @@ public class AlgaeNode : MonoBehaviour
         // Check if the manager exists and the Sponge tool is currently toggled ON
         if (manager != null && manager.IsSpongeToolActive())
         {
-            // Instantly wipe away 30% of the algae just by sliding the mouse over it!
-            currentAlgaeLevel -= 0.30f;
-            if (currentAlgaeLevel < 0f) currentAlgaeLevel = 0f;
+            // --- FIXED: DELTA-TIME GROWTH THRESHOLD GATE ---
+            // Because Update() grows algae slightly every frame, checking strictly for '> 0f' 
+            // fails when scrubbing. We use 0.05f (5% dirty) as our "functionally clean" cutoff!
+            if (currentAlgaeLevel > 0.05f)
+            {
+                // Instantly wipe away 30% of the algae just by sliding the mouse over it!
+                currentAlgaeLevel -= 0.30f;
+                if (currentAlgaeLevel < 0f) currentAlgaeLevel = 0f;
 
-            UpdateVisuals();
-            Debug.Log(gameObject.name + " scrubbed via hover! Current Algae: " + currentAlgaeLevel);
-            QuestManager.Instance.ProgressQuest("clean_algae", 1);
+                UpdateVisuals();
+                Debug.Log(gameObject.name + " scrubbed via hover! Current Algae: " + currentAlgaeLevel);
+
+                // Increments your quest tracking safely without exploitation loops
+                if (QuestManager.Instance != null)
+                {
+                    QuestManager.Instance.ProgressQuest("clean_algae", 1);
+                }
+            }
         }
     }
 
