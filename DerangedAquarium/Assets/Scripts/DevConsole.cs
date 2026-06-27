@@ -224,7 +224,7 @@ public class DevConsole : MonoBehaviour
         
         // --- INTEGRATED: ADD NEW IN-GAME SYSTEM HOOKS ---
         autocompleteList.Add("quests");
-        autocompleteList.Add("skipday");
+        autocompleteList.Add("skipquest");
     }
 
     private void ScanAndCacheAllGamePrefabs()
@@ -492,8 +492,8 @@ public class DevConsole : MonoBehaviour
                 ExecuteQuestsCommand();
                 break;
 
-            case "skipday":
-                ExecuteSkipDayCommand();
+            case "skipquest":
+                ExecuteSkipQuestCommand();
                 break;
 
             case "noclip":
@@ -558,7 +558,7 @@ public class DevConsole : MonoBehaviour
                   "• <b>help</b> - Displays this active cheat command overview panel.\n" +
                   "• <b>clear / cls</b> - Instantly wipes all previous console messages and clears the view.\n" +
                   "• <b>quests</b> - Displays your currently active quest progression registry cleanly in the logs.\n" +
-                  "• <b>skipday</b> - Forces an immediate 24-hour cycle fast-forward, re-rolling entirely new templates from the quest pool.\n" +
+                  "• <b>skipquest</b> - Forces the current quest to be skipped to the next one in line.\n" +
                   "• <b>noclip</b> - Toggles fly mode to pass through wall meshes and move out-of-bounds.\n" +
                   "• <b>timescale <float></b> - Adjusts simulation flow speed (e.g., 'timescale 4' speeds up growth and algae cycles).\n" +
                   "• <b>clearalgae</b> - Instantly clears away all green algae from every window node pane in the tank.\n" +
@@ -592,7 +592,7 @@ public class DevConsole : MonoBehaviour
     }
 
     // --- NEW: THE INSTANT TESTING HARNESS EVENT SIMULATOR ---
-    private void ExecuteSkipDayCommand()
+    private void ExecuteSkipQuestCommand()
     {
         if (QuestManager.Instance == null)
         {
