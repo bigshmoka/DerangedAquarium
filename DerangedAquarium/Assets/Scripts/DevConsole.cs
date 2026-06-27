@@ -24,7 +24,7 @@ public class DevConsole : MonoBehaviour
     private TMP_Text ghostTextMesh;
     private string currentSuggestion = "";
 
-    // --- FIXED: DEEP HISTORY BUFFER INDEX TRACKERS ---
+    // --- DYNAMIC COMMAND HISTORY FIELDS ---
     private List<string> commandHistory = new List<string>();
     private int historyIndex = -1;
 
@@ -55,6 +55,9 @@ public class DevConsole : MonoBehaviour
         }
 
         if (logDisplayText != null) logDisplayText.text = "";
+
+        // Shield the 3D player camera view from rendering 2D elements
+        ApplyCameraCullingMasks();
     }
 
     void OnEnable()
@@ -76,62 +79,8 @@ public class DevConsole : MonoBehaviour
             ToggleConsole();
         }
 
-        if (!isConsoleOpen) return;
-
-        // --- PHYSICAL TAB AUTOCOMPLETE WITH ARGUMENT SPACING ---
-        if (Input.GetKeyDown(KeyCode.Tab))
-        {
-            if (!string.IsNullOrEmpty(currentSuggestion))
-            {
-                string filledCommand = currentSuggestion;
-
-                if (filledCommand == "money" || filledCommand == "spawn" || filledCommand == "timescale")
-                {
-                    filledCommand += " ";
-                }
-
-                commandInputField.text = filledCommand;
-                commandInputField.caretPosition = filledCommand.Length;
-                commandInputField.ActivateInputField();
-
-                if (ghostTextMesh != null) ghostTextMesh.text = "";
-                currentSuggestion = "";
-            }
-        }
-
-        // --- FIXED: MULTI-TAP UP ARROW COMMAND HISTORY RECALL ---
-        if (Input.GetKeyDown(KeyCode.UpArrow) && commandHistory.Count > 0)
-        {
-            // Walk backward through history toward older commands
-            historyIndex--;
-            if (historyIndex < 0) historyIndex = 0; // Lock to your oldest logged input
-
-            commandInputField.text = commandHistory[historyIndex];
-            commandInputField.caretPosition = commandInputField.text.Length;
-            commandInputField.ActivateInputField();
-        }
-
-        // --- FIXED: DOWN ARROW HISTORY NAVIGATION FORWARD ---
-        if (Input.GetKeyDown(KeyCode.DownArrow) && commandHistory.Count > 0)
-        {
-            // Walk forward through history toward your newest inputs
-            historyIndex++;
-            if (historyIndex >= commandHistory.Count)
-            {
-                historyIndex = commandHistory.Count;
-                commandInputField.text = ""; // Clear line if scrolling past the newest command
-            }
-            else
-            {
-                commandInputField.text = commandHistory[historyIndex];
-            }
-            
-            commandInputField.caretPosition = commandInputField.text.Length;
-            commandInputField.ActivateInputField();
-        }
-
-        // --- DISTANCE-BASED 2D DELETION INTERACTION LOOP ---
-        if (isDevDeleting2D)
+        // Deletion logic runs outside the console open block so it works when panel is hidden
+        if (!isConsoleOpen && isDevDeleting2D)
         {
             if (Input.GetKeyDown(KeyCode.Escape) || Input.GetMouseButtonDown(1))
             {
@@ -140,12 +89,14 @@ public class DevConsole : MonoBehaviour
             }
             else if (Input.GetMouseButtonDown(0))
             {
-                Vector3 worldMousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+                Camera aquariumCam = GetOrthographicAquariumCamera();
+                
+                Vector3 worldMousePos = aquariumCam.ScreenToWorldPoint(Input.mousePosition);
                 Vector2 targetPoint2D = new Vector2(worldMousePos.x, worldMousePos.y);
                 
                 SpriteRenderer[] allSceneSprites = FindObjectsByType<SpriteRenderer>(FindObjectsSortMode.None);
                 
-                float maxClickRadiusCheck = 0.75f; 
+                float maxClickRadiusCheck = 1.5f; 
                 float closestDistanceFound = maxClickRadiusCheck;
                 Transform rootTargetToDestroy = null;
 
@@ -166,12 +117,25 @@ public class DevConsole : MonoBehaviour
                             currentCheckNode = currentCheckNode.parent;
                         }
 
-                        bool isAlgaeGrid = currentCheckNode.GetComponent<AlgaeNode>() != null || currentCheckNode.name.Contains("Algae");
-                        bool isCoreEngine = currentCheckNode.name.Contains("Manager") || currentCheckNode.name.Contains("Camera") || currentCheckNode.name.Contains("Canvas");
+                        // --- FIXED: DUAL-LAYER STRUCTURAL FILTERS ---
+                        // Extract lower-case strings to make the matching process case-insensitive
+                        string spriteNameLower = sprite.gameObject.name.ToLower();
+                        string rootNameLower = currentCheckNode.gameObject.name.ToLower();
 
-                        if (isAlgaeGrid || isCoreEngine)
+                        // Identify background structural keywords
+                        bool isAlgaeGrid = currentCheckNode.GetComponent<AlgaeNode>() != null || rootNameLower.Contains("algae");
+                        bool isCoreEngine = rootNameLower.Contains("manager") || rootNameLower.Contains("camera") || rootNameLower.Contains("canvas");
+                        
+                        // Protects background, backdrop image maps, tank wall lines, and glass borders
+                        bool isBackgroundPrefab = spriteNameLower.Contains("background") || rootNameLower.Contains("background") ||
+                                                  spriteNameLower.Contains("backdrop")   || rootNameLower.Contains("backdrop")   ||
+                                                  spriteNameLower.Contains("glass")      || rootNameLower.Contains("glass")      ||
+                                                  spriteNameLower.Contains("grid")       || rootNameLower.Contains("grid")       ||
+                                                  spriteNameLower.Contains("wall")       || rootNameLower.Contains("wall");
+
+                        if (isAlgaeGrid || isCoreEngine || isBackgroundPrefab)
                         {
-                            continue; 
+                            continue; // Safely bypass this object layout and protect it from destruction
                         }
 
                         closestDistanceFound = currentDistance;
@@ -185,6 +149,58 @@ public class DevConsole : MonoBehaviour
                     Destroy(rootTargetToDestroy.gameObject);
                 }
             }
+        }
+
+        if (!isConsoleOpen) return;
+
+        // PHYSICAL TAB AUTOCOMPLETE WITH ARGUMENT SPACING
+        if (Input.GetKeyDown(KeyCode.Tab))
+        {
+            if (!string.IsNullOrEmpty(currentSuggestion))
+            {
+                string filledCommand = currentSuggestion;
+
+                if (filledCommand == "money" || filledCommand == "spawn" || filledCommand == "timescale")
+                {
+                    filledCommand += " ";
+                }
+
+                commandInputField.text = filledCommand;
+                commandInputField.caretPosition = filledCommand.Length;
+                commandInputField.ActivateInputField();
+
+                if (ghostTextMesh != null) ghostTextMesh.text = "";
+                currentSuggestion = "";
+            }
+        }
+
+        // MULTI-TAP UP ARROW COMMAND HISTORY RECALL
+        if (Input.GetKeyDown(KeyCode.UpArrow) && commandHistory.Count > 0)
+        {
+            historyIndex--;
+            if (historyIndex < 0) historyIndex = 0; 
+
+            commandInputField.text = commandHistory[historyIndex];
+            commandInputField.caretPosition = commandInputField.text.Length;
+            commandInputField.ActivateInputField();
+        }
+
+        // DOWN ARROW HISTORY NAVIGATION FORWARD
+        if (Input.GetKeyDown(KeyCode.DownArrow) && commandHistory.Count > 0)
+        {
+            historyIndex++;
+            if (historyIndex >= commandHistory.Count)
+            {
+                historyIndex = commandHistory.Count;
+                commandInputField.text = ""; 
+            }
+            else
+            {
+                commandInputField.text = commandHistory[historyIndex];
+            }
+            
+            commandInputField.caretPosition = commandInputField.text.Length;
+            commandInputField.ActivateInputField();
         }
     }
 
@@ -396,14 +412,11 @@ public class DevConsole : MonoBehaviour
 
         Debug.Log($"] {cleanedInput}"); 
 
-        // --- FIXED: COMPILE LINE ENTRY INTO THE HISTORY LIST ---
-        // Optimization check: Don't add duplicate back-to-back entries to keep history clean
         if (commandHistory.Count == 0 || commandHistory[commandHistory.Count - 1] != cleanedInput)
         {
             commandHistory.Add(cleanedInput);
         }
         
-        // Reset the navigation index pointer back past the end of the list
         historyIndex = commandHistory.Count;
 
         string[] inputPieces = cleanedInput.Split(' ');
@@ -504,7 +517,7 @@ public class DevConsole : MonoBehaviour
         {
             ToggleConsole();
             isDevDeleting2D = true;
-            Debug.Log("<color=yellow>[Console Delete Mode]</color> 2D Aquarium Delete Active! Left-Click any fish, snail, decoration, or feeder to delete it. Algae panels are fully protected. Press Escape or Right-Click to leave.");
+            Debug.Log("<color=yellow>[Console Delete Mode]</color> 2D Aquarium Delete Active! Left-Click any fish, snail, decoration, or feeder to delete it. Algae panels and structural backgrounds are fully protected. Press Escape or Right-Click to leave.");
         }
         else
         {
@@ -536,8 +549,37 @@ public class DevConsole : MonoBehaviour
             AquariumManager currentActiveTankManager = FindFirstObjectByType<AquariumManager>();
             if (currentActiveTankManager != null)
             {
-                currentActiveTankManager.SpawnBabyFish(target2DPrefab, Vector3.zero);
-                Debug.Log($"<color=cyan>[Console]</color> Successfully spawned custom fish type instance: <b>{target2DPrefab.name}</b> at tank center origin coordinates.");
+                Vector3 localizedSpawnPoint = currentActiveTankManager.transform.position;
+                
+                currentActiveTankManager.SpawnBabyFish(target2DPrefab, localizedSpawnPoint);
+
+                int aqLayerIndex = LayerMask.NameToLayer("Aquarium");
+                if (aqLayerIndex != -1)
+                {
+                    foreach (NaturalFishAI fish in FindObjectsByType<NaturalFishAI>(FindObjectsSortMode.None))
+                    {
+                        if (fish.gameObject.layer != aqLayerIndex)
+                        {
+                            SetLayerRecursive(fish.gameObject, aqLayerIndex);
+                        }
+                    }
+                    foreach (SnailAI snail in FindObjectsByType<SnailAI>(FindObjectsSortMode.None))
+                    {
+                        if (snail.gameObject.layer != aqLayerIndex)
+                        {
+                            SetLayerRecursive(snail.gameObject, aqLayerIndex);
+                        }
+                    }
+                    foreach (SpriteRenderer sprite in FindObjectsByType<SpriteRenderer>(FindObjectsSortMode.None))
+                    {
+                        if (sprite.transform.IsChildOf(currentActiveTankManager.transform) && sprite.gameObject.layer != aqLayerIndex)
+                        {
+                            SetLayerRecursive(sprite.gameObject, aqLayerIndex);
+                        }
+                    }
+                }
+
+                Debug.Log($"<color=cyan>[Console]</color> Successfully spawned custom fish type instance: <b>{target2DPrefab.name}</b> at native scale sizes.");
             }
             else
             {
@@ -563,6 +605,56 @@ public class DevConsole : MonoBehaviour
         }
 
         Debug.LogError($"[Console] Spawn Failed. No prefab named '<b>{argument}</b>' found in AquariumPrefabs or StorefrontPrefabs directories.");
+    }
+
+    private void SetLayerRecursive(GameObject obj, int newLayer)
+    {
+        obj.layer = newLayer;
+        foreach (Transform child in obj.transform)
+        {
+            SetLayerRecursive(child.gameObject, newLayer);
+        }
+    }
+
+    private void ApplyCameraCullingMasks()
+    {
+        PlayerController3D player = FindFirstObjectByType<PlayerController3D>();
+        if (player != null && player.playerCamera != null)
+        {
+            Camera main3DCameraComponent = player.playerCamera.GetComponent<Camera>();
+            if (main3DCameraComponent != null)
+            {
+                int aqLayerIndex = LayerMask.NameToLayer("Aquarium");
+                if (aqLayerIndex != -1)
+                {
+                    main3DCameraComponent.cullingMask &= ~(1 << aqLayerIndex);
+                }
+            }
+        }
+    }
+
+    private Camera GetOrthographicAquariumCamera()
+    {
+        int aqLayerIndex = LayerMask.NameToLayer("Aquarium");
+        
+        foreach (Camera cam in FindObjectsByType<Camera>(FindObjectsSortMode.None))
+        {
+            if (cam.orthographic)
+            {
+                if (aqLayerIndex != -1 && (cam.cullingMask & (1 << aqLayerIndex)) != 0)
+                {
+                    return cam;
+                }
+            }
+        }
+
+        foreach (Camera cam in FindObjectsByType<Camera>(FindObjectsSortMode.None))
+        {
+            if (cam.orthographic && (cam.name.Contains("Aquarium") || cam.name.Contains("Tank"))) 
+                return cam;
+        }
+
+        return Camera.main; 
     }
 
     private void ExecuteTimescaleCommand(string argument)
