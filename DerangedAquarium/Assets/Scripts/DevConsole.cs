@@ -52,7 +52,7 @@ public class DevConsole : MonoBehaviour
             InitializeBaseCommands();
             ScanAndCacheAllGamePrefabs();
             
-            // --- FIXED: SORT THE LIST ALPHABETICALLY TO PRIORITIZE ROOT WORDS ---
+            // SORT THE LIST ALPHABETICALLY TO PRIORITIZE ROOT WORDS OVER EXTENSIONS
             autocompleteList.Sort();
             
             CreateGhostTextOverlay();
@@ -174,7 +174,7 @@ public class DevConsole : MonoBehaviour
             }
         }
 
-        // --- FIXED: CLEAN ERROR-FREE COMMAND HISTORY RECALL ---
+        // CLEAN ERROR-FREE COMMAND HISTORY RECALL
         if (Input.GetKeyDown(KeyCode.UpArrow) && commandHistory.Count > 0)
         {
             historyIndex--;
@@ -221,6 +221,10 @@ public class DevConsole : MonoBehaviour
         autocompleteList.Add("delete");
         autocompleteList.Add("clear");
         autocompleteList.Add("cls");
+        
+        // --- INTEGRATED: ADD NEW IN-GAME SYSTEM HOOKS ---
+        autocompleteList.Add("quests");
+        autocompleteList.Add("skipday");
     }
 
     private void ScanAndCacheAllGamePrefabs()
@@ -416,6 +420,12 @@ public class DevConsole : MonoBehaviour
     {
         if (logDisplayText == null) return;
 
+        // --- RECURSION SHEILD: DROPS TEXT GLYPH ERRORS IMMEDIATELY ---
+        if (logMessage.Contains("font asset") || logMessage.Contains("Unicode value") || logMessage.Contains("character with Unicode"))
+        {
+            return;
+        }
+
         string textHexColor = "#DFDFDF"; 
         
         if (logType == LogType.Warning)
@@ -476,6 +486,14 @@ public class DevConsole : MonoBehaviour
             case "cls":
                 if (logDisplayText != null) logDisplayText.text = "";
                 Debug.Log("[Console] Log screen cleared successfully.");
+                break;
+
+            case "quests":
+                ExecuteQuestsCommand();
+                break;
+
+            case "skipday":
+                ExecuteSkipDayCommand();
                 break;
 
             case "noclip":
@@ -539,6 +557,8 @@ public class DevConsole : MonoBehaviour
         Debug.Log("<b>=== DEV CONSOLE HELP REGISTRY ===</b>\n" +
                   "• <b>help</b> - Displays this active cheat command overview panel.\n" +
                   "• <b>clear / cls</b> - Instantly wipes all previous console messages and clears the view.\n" +
+                  "• <b>quests</b> - Displays your currently active quest progression registry cleanly in the logs.\n" +
+                  "• <b>skipday</b> - Forces an immediate 24-hour cycle fast-forward, re-rolling entirely new templates from the quest pool.\n" +
                   "• <b>noclip</b> - Toggles fly mode to pass through wall meshes and move out-of-bounds.\n" +
                   "• <b>timescale <float></b> - Adjusts simulation flow speed (e.g., 'timescale 4' speeds up growth and algae cycles).\n" +
                   "• <b>clearalgae</b> - Instantly clears away all green algae from every window node pane in the tank.\n" +
@@ -549,6 +569,39 @@ public class DevConsole : MonoBehaviour
                   "• <b>clearitems</b> - Instantly sweeps and deletes all placed 3D shop furniture elements.\n" +
                   "• <b>save</b> - Commits finances, shop layouts, fish growth metrics, and algae nodes to local file.\n" +
                   "• <b>load</b> - Completely rebuilds your multi-scene game status using your persistent file registry.");
+    }
+
+    private void ExecuteQuestsCommand()
+    {
+        if (QuestManager.Instance == null)
+        {
+            Debug.LogWarning("[Console] QuestManager instance cannot be tracked in current memory runtime.");
+            return;
+        }
+
+        // OUTPUT TIMER FORMATTING REMAINING TIME VALUES TO THE LOG VIEW WINDOW LAYER
+        Debug.Log($"<b>=== ACTIVE TYCOON QUEST REGISTRY (Time Left: {QuestManager.Instance.GetTimeRemainingString()}) ===</b>");
+        foreach (Quest q in QuestManager.Instance.activeQuests)
+        {
+            string markerState = q.isCompleted 
+                ? "<color=#55FF55>[COMPLETED]</color>" 
+                : $"<color=#FFCC00>({q.currentCount}/{q.targetCount})</color>";
+
+            Debug.Log($"• {q.description} - {markerState} | Reward: <color=#66FF66>${q.cashReward}</color>");
+        }
+    }
+
+    // --- NEW: THE INSTANT TESTING HARNESS EVENT SIMULATOR ---
+    private void ExecuteSkipDayCommand()
+    {
+        if (QuestManager.Instance == null)
+        {
+            Debug.LogWarning("[Console] QuestManager instance cannot be tracked in current memory runtime.");
+            return;
+        }
+
+        QuestManager.Instance.RotateDailyQuests();
+        Debug.Log("<color=cyan>[Console Tooling]</color> Successfully bypassed timer constraints! Accelerated 24 hours into the future.");
     }
 
     private void ExecuteDeleteCommand()

@@ -70,7 +70,6 @@ public class NaturalFishAI : MonoBehaviour
         spriteRenderer = GetComponent<SpriteRenderer>();
         transform.rotation = Quaternion.identity;
 
-        // --- FIXED: SKIP OVERWRITING DEFAULTS IF DATA PRE-EXISTED ON INJECTION ---
         if (baseScale == Vector3.zero)
         {
             baseScale = transform.localScale;
@@ -284,6 +283,13 @@ public class NaturalFishAI : MonoBehaviour
 
                 GrowFish();
                 SpawnMoneyReward();
+
+                // --- INTEGRATED: PROGRESS THE FISH-FEEDING QUEST ---
+                if (QuestManager.Instance != null)
+                {
+                    QuestManager.Instance.ProgressQuest("feed_fish", 1);
+                }
+
                 PickNewDestination(); 
             }
         }

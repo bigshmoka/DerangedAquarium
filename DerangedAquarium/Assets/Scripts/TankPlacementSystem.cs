@@ -70,6 +70,13 @@ public class TankPlacementSystem : MonoBehaviour
             {
                 SpriteRenderer sr = activeDecorationPreview.GetComponent<SpriteRenderer>();
                 if (sr != null) sr.color = new Color(sr.color.r, sr.color.g, sr.color.b, 1.0f);
+
+                // --- INTEGRATED: PROGRESS DECOR QUEST FOR 2D DECORATIONS ---
+                if (QuestManager.Instance != null)
+                {
+                    QuestManager.Instance.ProgressQuest("place_decor", 1);
+                }
+
                 activeDecorationPreview = null;
                 isPlacingDecoration = false;
                 selectedDecorationPrefab = null;
@@ -114,6 +121,12 @@ public class TankPlacementSystem : MonoBehaviour
         {
             if (economy.TrySpendMoney(selectedItemCost))
             {
+                // --- INTEGRATED: PROGRESS DECOR QUEST FOR 2D ITEMS (LIKE AUTO FEEDERS) ---
+                if (QuestManager.Instance != null)
+                {
+                    QuestManager.Instance.ProgressQuest("place_decor", 1);
+                }
+
                 activeItemPreview = null;
                 isPlacingItem = false;
                 selectedItemPrefab = null;

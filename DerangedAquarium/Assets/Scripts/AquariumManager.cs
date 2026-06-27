@@ -49,16 +49,12 @@ public class AquariumManager : MonoBehaviour
 
     void Awake()
     {
-        // 1. Fetch or attach all sub-component modules
         economy = gameObject.GetComponent<TankEconomy>() ?? gameObject.AddComponent<TankEconomy>();
         shopUI = gameObject.GetComponent<TankShopUI>() ?? gameObject.AddComponent<TankShopUI>();
         hierarchyTracker = gameObject.GetComponent<TankHierarchyTracker>() ?? gameObject.AddComponent<TankHierarchyTracker>();
         placementSystem = gameObject.GetComponent<TankPlacementSystem>() ?? gameObject.AddComponent<TankPlacementSystem>();
         inputHandler = gameObject.GetComponent<TankInputHandler>() ?? gameObject.AddComponent<TankInputHandler>();
 
-        // 2. --- FIX: ASSIGN UI REFERENCES FIRST ---
-        // We populate these variables BEFORE initializing systems so that components
-        // like TankEconomy can see and register the moneyText component successfully!
         shopUI.shopMenuWindow = shopMenuWindow;
         shopUI.moneyText = moneyText;
         shopUI.errorNotificationText = errorNotificationText;
@@ -69,7 +65,6 @@ public class AquariumManager : MonoBehaviour
 
         inputHandler.foodPrefab = foodPrefab;
 
-        // 3. Now initialize sub-systems safely with populated data fields
         economy.Initialize(shopUI);
         placementSystem.Initialize(economy, shopUI);
         inputHandler.Initialize(shopUI, placementSystem, hierarchyTracker);
@@ -125,6 +120,12 @@ public class AquariumManager : MonoBehaviour
         {
             shopUI.CloseShopMenu();
             SpawnBabyFish(prefab, Vector3.zero);
+
+            // --- INTEGRATED: PROGRESS THE CREATURE PURCHASE QUEST ---
+            if (QuestManager.Instance != null)
+            {
+                QuestManager.Instance.ProgressQuest("buy_creatures", 1);
+            }
         }
         else if (economy.totalMoney < cost)
         {

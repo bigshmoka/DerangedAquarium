@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 9211209324852539755}
   - component: {fileID: 8181217699287364241}
   - component: {fileID: 6625452781183634843}
+  - component: {fileID: 3579236770931359933}
   m_Layer: 0
   m_Name: --- GLOBAL SYSTEM ---
   m_TagString: Untagged
@@ -78,6 +79,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 037f6876208c3a648a3e10e49965c510, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SaveManager
+--- !u!114 &3579236770931359933
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1292239564342206971}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 205935a19f821c44aab3ec8b1188aa98, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::QuestManager
+  activeQuests: []
 --- !u!1 &2741522133616320174
 GameObject:
   m_ObjectHideFlags: 0

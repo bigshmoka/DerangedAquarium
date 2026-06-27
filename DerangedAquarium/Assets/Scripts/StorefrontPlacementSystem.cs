@@ -139,10 +139,14 @@ public class StorefrontPlacementSystem : MonoBehaviour
             GameObject placedObject = Instantiate(selectedPrefab, ghostPreviewInstance.transform.position, ghostPreviewInstance.transform.rotation, activeParentContainer);
             placedObject.name = selectedPrefab.name + "_Placed";
 
-            // --- NEW: THE PRICE STAMP ENGINE ---
-            // Attaches the PlacedItemData script to the object instance and saves its buy cost
             PlacedItemData itemData = placedObject.AddComponent<PlacedItemData>();
             itemData.originalCost = currentItemCost;
+
+            // --- INTEGRATED: PROGRESS THE 3D PLACEMENT QUEST ---
+            if (QuestManager.Instance != null)
+            {
+                QuestManager.Instance.ProgressQuest("place_decor", 1);
+            }
 
             EndPlacementWorkflow();
         }
@@ -170,6 +174,7 @@ public class StorefrontPlacementSystem : MonoBehaviour
         if (player != null) player.SetPlayerLockState(false);
     }
 
+    // --- RESTORED: GHOST TRANSPARENCY SHADER FILTER ENGINE ---
     private void ApplyGhostTransparency(GameObject target, float alphaValue)
     {
         Renderer[] targetRenderers = target.GetComponentsInChildren<Renderer>();
