@@ -13,9 +13,14 @@ public class PlayerController3D : MonoBehaviour
     private Rigidbody rb;
     private bool isLocked = false;
 
+    // --- NOCLIP FLIGHT VARIABLES ---
+    private bool isNoclip = false;
+    private Collider playerCollider;
+
     void Start()
     {
         rb = GetComponent<Rigidbody>();
+        playerCollider = GetComponent<Collider>();
         
         // Freeze Rigidbody rotations so physics forces don't knock the player over
         rb.freezeRotation = true;
@@ -47,16 +52,55 @@ public class PlayerController3D : MonoBehaviour
     {
         if (isLocked)
         {
-            rb.linearVelocity = Vector3.zero; // Stops all physical momentum when interacting
+            if (rb != null && !rb.isKinematic)
+            {
+                rb.linearVelocity = Vector3.zero; 
+            }
             return;
         }
 
-        // 2. Handle Keyboard WASD Movement Relative to Facing Direction
+        // --- NOCLIP FLIGHT NAVIGATION CONTROL ENGINE ---
+        if (isNoclip)
+        {
+            float flyX = Input.GetAxisRaw("Horizontal");
+            float flyZ = Input.GetAxisRaw("Vertical");
+            
+            // Explicit vertical keyboard lift mechanics
+            float flyY = 0f;
+            if (Input.GetKey(KeyCode.Space)) flyY = 1f;
+            if (Input.GetKey(KeyCode.LeftShift)) flyY = -1f;
+
+            Vector3 flyDirection = Vector3.zero;
+
+            // Drive travel vector along the exact pitch and yaw direction of the player camera look vector
+            if (playerCamera != null)
+            {
+                flyDirection = (playerCamera.forward * flyZ + playerCamera.right * flyX).normalized;
+            }
+            else
+            {
+                flyDirection = (transform.forward * flyZ + transform.right * flyX).normalized;
+            }
+
+            // Combine standard horizontal vector mappings with manual elevation values
+            flyDirection += Vector3.up * flyY;
+            if (flyDirection.sqrMagnitude > 0.01f) flyDirection.Normalize();
+
+            // Translate player position through space smoothly (with a speed multiplier for comfort)
+            transform.position += flyDirection * (moveSpeed * 2.5f) * Time.fixedDeltaTime;
+            return;
+        }
+
+        // 2. Handle Keyboard WASD Movement Relative to Facing Direction (Standard Ground Physics)
         float moveX = Input.GetAxisRaw("Horizontal");
         float moveZ = Input.GetAxisRaw("Vertical");
 
         Vector3 moveDirection = (transform.forward * moveZ + transform.right * moveX).normalized;
-        rb.linearVelocity = new Vector3(moveDirection.x * moveSpeed, rb.linearVelocity.y, moveDirection.z * moveSpeed);
+        
+        if (rb != null && !rb.isKinematic)
+        {
+            rb.linearVelocity = new Vector3(moveDirection.x * moveSpeed, rb.linearVelocity.y, moveDirection.z * moveSpeed);
+        }
     }
 
     // Call this from other scripts to freeze the player when looking at the fish tank
@@ -71,8 +115,42 @@ public class PlayerController3D : MonoBehaviour
         }
         else
         {
+            // --- FIXED: FORCE IMMERSIVE CROSSHAIR LOCK ---
+            // Removed the problematic noclip condition wrap. Closing the console 
+            // or exiting shop layouts will now always correctly lock the pointer mesh!
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
         }
+    }
+
+    // --- SYSTEM INTERFACE TOGGLE FOR NOCLIP CHEAT ENGINE ---
+    public bool ToggleNoclip()
+    {
+        isNoclip = !isNoclip;
+
+        if (rb != null)
+        {
+            if (isNoclip)
+            {
+                rb.linearVelocity = Vector3.zero;
+                rb.isKinematic = true;
+                rb.useGravity = false;
+            }
+            else
+            {
+                rb.isKinematic = false;
+                rb.useGravity = true;
+                rb.linearVelocity = Vector3.zero;
+            }
+        }
+
+        // Turning off the collider allows passing completely through wall/floor meshes
+        if (playerCollider == null) playerCollider = GetComponent<Collider>();
+        if (playerCollider != null)
+        {
+            playerCollider.enabled = !isNoclip;
+        }
+
+        return isNoclip;
     }
 }

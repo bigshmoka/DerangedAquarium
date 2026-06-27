@@ -1,5 +1,6 @@
 using UnityEngine;
 using TMPro;
+using System.Collections.Generic;
 
 public class DevConsole : MonoBehaviour
 {
@@ -19,6 +20,22 @@ public class DevConsole : MonoBehaviour
 
     private bool isConsoleOpen = false;
 
+    // --- AUTOCOMPLETE STORAGE FIELDS ---
+    private TMP_Text ghostTextMesh;
+    private string currentSuggestion = "";
+
+    // --- FIXED: DEEP HISTORY BUFFER INDEX TRACKERS ---
+    private List<string> commandHistory = new List<string>();
+    private int historyIndex = -1;
+
+    // --- DYNAMIC RUNTIME INVENTORY CACHING ENGINES ---
+    private List<string> autocompleteList = new List<string>();
+    private Dictionary<string, GameObject> fishPrefabCache = new Dictionary<string, GameObject>();
+    private Dictionary<string, GameObject> storefrontPrefabCache = new Dictionary<string, GameObject>();
+
+    // --- 2D MOUSE SELECTION DELETE CONTEXT MODE ---
+    private bool isDevDeleting2D = false;
+
     void Start()
     {
         if (consolePanel != null) consolePanel.SetActive(false);
@@ -28,6 +45,13 @@ public class DevConsole : MonoBehaviour
             commandInputField.DeactivateInputField();
             commandInputField.onSubmit.RemoveAllListeners();
             commandInputField.onSubmit.AddListener(ProcessSubmittedText);
+
+            commandInputField.onValueChanged.RemoveAllListeners();
+            commandInputField.onValueChanged.AddListener(OnInputValueChanged);
+
+            InitializeBaseCommands();
+            ScanAndCacheAllGamePrefabs();
+            CreateGhostTextOverlay();
         }
 
         if (logDisplayText != null) logDisplayText.text = "";
@@ -36,17 +60,12 @@ public class DevConsole : MonoBehaviour
     void OnEnable()
     {
         Application.logMessageReceived += CaptureGameEngineLogs;
-        
-        // --- THE ULTIMATE SCROLLBAR FIX ---
-        // We subscribe to the absolute last millisecond of Unity's UI rendering pipeline.
         Canvas.willRenderCanvases += ClampScrollbar;
     }
 
     void OnDisable()
     {
         Application.logMessageReceived -= CaptureGameEngineLogs;
-        
-        // Always clean up the subscription to prevent memory leaks!
         Canvas.willRenderCanvases -= ClampScrollbar;
     }
 
@@ -56,19 +75,233 @@ public class DevConsole : MonoBehaviour
         {
             ToggleConsole();
         }
+
+        if (!isConsoleOpen) return;
+
+        // --- PHYSICAL TAB AUTOCOMPLETE WITH ARGUMENT SPACING ---
+        if (Input.GetKeyDown(KeyCode.Tab))
+        {
+            if (!string.IsNullOrEmpty(currentSuggestion))
+            {
+                string filledCommand = currentSuggestion;
+
+                if (filledCommand == "money" || filledCommand == "spawn" || filledCommand == "timescale")
+                {
+                    filledCommand += " ";
+                }
+
+                commandInputField.text = filledCommand;
+                commandInputField.caretPosition = filledCommand.Length;
+                commandInputField.ActivateInputField();
+
+                if (ghostTextMesh != null) ghostTextMesh.text = "";
+                currentSuggestion = "";
+            }
+        }
+
+        // --- FIXED: MULTI-TAP UP ARROW COMMAND HISTORY RECALL ---
+        if (Input.GetKeyDown(KeyCode.UpArrow) && commandHistory.Count > 0)
+        {
+            // Walk backward through history toward older commands
+            historyIndex--;
+            if (historyIndex < 0) historyIndex = 0; // Lock to your oldest logged input
+
+            commandInputField.text = commandHistory[historyIndex];
+            commandInputField.caretPosition = commandInputField.text.Length;
+            commandInputField.ActivateInputField();
+        }
+
+        // --- FIXED: DOWN ARROW HISTORY NAVIGATION FORWARD ---
+        if (Input.GetKeyDown(KeyCode.DownArrow) && commandHistory.Count > 0)
+        {
+            // Walk forward through history toward your newest inputs
+            historyIndex++;
+            if (historyIndex >= commandHistory.Count)
+            {
+                historyIndex = commandHistory.Count;
+                commandInputField.text = ""; // Clear line if scrolling past the newest command
+            }
+            else
+            {
+                commandInputField.text = commandHistory[historyIndex];
+            }
+            
+            commandInputField.caretPosition = commandInputField.text.Length;
+            commandInputField.ActivateInputField();
+        }
+
+        // --- DISTANCE-BASED 2D DELETION INTERACTION LOOP ---
+        if (isDevDeleting2D)
+        {
+            if (Input.GetKeyDown(KeyCode.Escape) || Input.GetMouseButtonDown(1))
+            {
+                isDevDeleting2D = false;
+                Debug.Log("<color=yellow>[Console Delete Mode]</color> 2D Tank Delete Mode Deactivated.");
+            }
+            else if (Input.GetMouseButtonDown(0))
+            {
+                Vector3 worldMousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+                Vector2 targetPoint2D = new Vector2(worldMousePos.x, worldMousePos.y);
+                
+                SpriteRenderer[] allSceneSprites = FindObjectsByType<SpriteRenderer>(FindObjectsSortMode.None);
+                
+                float maxClickRadiusCheck = 0.75f; 
+                float closestDistanceFound = maxClickRadiusCheck;
+                Transform rootTargetToDestroy = null;
+
+                foreach (SpriteRenderer sprite in allSceneSprites)
+                {
+                    if (sprite.transform.IsChildOf(this.transform) || sprite.gameObject.layer == LayerMask.NameToLayer("UI"))
+                        continue;
+
+                    float currentDistance = Vector2.Distance(targetPoint2D, sprite.transform.position);
+
+                    if (currentDistance < closestDistanceFound)
+                    {
+                        Transform currentCheckNode = sprite.transform;
+                        while (currentCheckNode.parent != null && 
+                               currentCheckNode.parent.GetComponent<AquariumManager>() == null && 
+                               !currentCheckNode.parent.name.Contains("---"))
+                        {
+                            currentCheckNode = currentCheckNode.parent;
+                        }
+
+                        bool isAlgaeGrid = currentCheckNode.GetComponent<AlgaeNode>() != null || currentCheckNode.name.Contains("Algae");
+                        bool isCoreEngine = currentCheckNode.name.Contains("Manager") || currentCheckNode.name.Contains("Camera") || currentCheckNode.name.Contains("Canvas");
+
+                        if (isAlgaeGrid || isCoreEngine)
+                        {
+                            continue; 
+                        }
+
+                        closestDistanceFound = currentDistance;
+                        rootTargetToDestroy = currentCheckNode;
+                    }
+                }
+
+                if (rootTargetToDestroy != null)
+                {
+                    Debug.Log($"<color=red>[Console Delete Mode]</color> Vaporized 2D Object Target Asset: <b>{rootTargetToDestroy.gameObject.name}</b>");
+                    Destroy(rootTargetToDestroy.gameObject);
+                }
+            }
+        }
     }
 
-    // --- NEW: THE RENDER-PASS CLAMP ---
+    private void InitializeBaseCommands()
+    {
+        autocompleteList.Clear();
+        autocompleteList.Add("help");
+        autocompleteList.Add("noclip");
+        autocompleteList.Add("timescale");
+        autocompleteList.Add("clearalgae");
+        autocompleteList.Add("growalgae");
+        autocompleteList.Add("growlagae");
+        autocompleteList.Add("money");
+        autocompleteList.Add("clearitems");
+        autocompleteList.Add("save");
+        autocompleteList.Add("load");
+        autocompleteList.Add("spawn");
+        autocompleteList.Add("delete");
+    }
+
+    private void ScanAndCacheAllGamePrefabs()
+    {
+        fishPrefabCache.Clear();
+        storefrontPrefabCache.Clear();
+
+        GameObject[] loadedAquaticAssets = Resources.LoadAll<GameObject>("AquariumPrefabs");
+        foreach (GameObject prefab in loadedAquaticAssets)
+        {
+            if (prefab != null)
+            {
+                string lowerCaseName = prefab.name.ToLower();
+                autocompleteList.Add("spawn " + lowerCaseName);
+                if (!fishPrefabCache.ContainsKey(lowerCaseName))
+                {
+                    fishPrefabCache.Add(lowerCaseName, prefab);
+                }
+            }
+        }
+
+        GameObject[] loadedFurnitureAssets = Resources.LoadAll<GameObject>("StorefrontPrefabs");
+        foreach (GameObject prefab in loadedFurnitureAssets)
+        {
+            if (prefab != null)
+            {
+                string lowerCaseName = prefab.name.ToLower();
+                autocompleteList.Add("spawn " + lowerCaseName);
+                if (!storefrontPrefabCache.ContainsKey(lowerCaseName))
+                {
+                    storefrontPrefabCache.Add(lowerCaseName, prefab);
+                }
+            }
+        }
+    }
+
     private void ClampScrollbar()
     {
-        // Because this runs AFTER Unity's hidden ScrollRect math, we get the final word.
-        // It allows the handle to shrink naturally as the log grows, but completely 
-        // stops it from ever shrinking smaller than 5% (0.05f) of the window height.
         if (isConsoleOpen && logScrollRect != null && logScrollRect.verticalScrollbar != null)
         {
             if (logScrollRect.verticalScrollbar.size < 0.05f)
             {
                 logScrollRect.verticalScrollbar.size = 0.05f;
+            }
+        }
+    }
+
+    private void CreateGhostTextOverlay()
+    {
+        if (commandInputField == null) return;
+
+        TMP_Text mainTextComponent = commandInputField.textComponent;
+        if (mainTextComponent == null) return;
+
+        GameObject ghostObj = new GameObject("ConsoleGhostPreviewText");
+        ghostObj.transform.SetParent(mainTextComponent.transform.parent, false);
+
+        ghostTextMesh = ghostObj.AddComponent<TextMeshProUGUI>();
+        ghostTextMesh.font = mainTextComponent.font;
+        ghostTextMesh.fontSize = mainTextComponent.fontSize;
+        ghostTextMesh.fontStyle = mainTextComponent.fontStyle;
+        ghostTextMesh.alignment = mainTextComponent.alignment;
+        ghostTextMesh.margin = mainTextComponent.margin;
+
+        ghostTextMesh.color = new Color(0.6f, 0.6f, 0.6f, 0.45f); 
+        ghostTextMesh.raycastTarget = false; 
+
+        RectTransform ghostRect = ghostObj.GetComponent<RectTransform>();
+        RectTransform mainRect = mainTextComponent.GetComponent<RectTransform>();
+        
+        if (ghostRect != null && mainRect != null)
+        {
+            ghostRect.anchorMin = mainRect.anchorMin;
+            ghostRect.anchorMax = mainRect.anchorMax;
+            ghostRect.pivot = mainRect.pivot;
+            ghostRect.anchoredPosition = mainRect.anchoredPosition;
+            ghostRect.sizeDelta = mainRect.sizeDelta;
+        }
+
+        ghostObj.transform.SetAsFirstSibling();
+        ghostTextMesh.text = "";
+    }
+
+    private void OnInputValueChanged(string currentInput)
+    {
+        currentSuggestion = "";
+        if (ghostTextMesh != null) ghostTextMesh.text = "";
+
+        if (string.IsNullOrEmpty(currentInput) || !isConsoleOpen)
+        {
+            return;
+        }
+
+        foreach (string command in autocompleteList)
+        {
+            if (command.StartsWith(currentInput.ToLower()))
+            {
+                currentSuggestion = command;
+                break;
             }
         }
     }
@@ -86,6 +319,8 @@ public class DevConsole : MonoBehaviour
 
         if (isConsoleOpen)
         {
+            isDevDeleting2D = false;
+
             if (commandInputField != null)
             {
                 commandInputField.ActivateInputField();
@@ -102,6 +337,9 @@ public class DevConsole : MonoBehaviour
         else
         {
             if (commandInputField != null) commandInputField.DeactivateInputField();
+
+            if (ghostTextMesh != null) ghostTextMesh.text = "";
+            currentSuggestion = "";
 
             StorefrontShopUI storefrontShop = FindFirstObjectByType<StorefrontShopUI>();
             AquariumManager aquariumManager = FindFirstObjectByType<AquariumManager>();
@@ -155,13 +393,29 @@ public class DevConsole : MonoBehaviour
         if (string.IsNullOrEmpty(rawInput)) return;
 
         string cleanedInput = rawInput.Trim();
-        Debug.Log($"] {cleanedInput}");
+
+        Debug.Log($"] {cleanedInput}"); 
+
+        // --- FIXED: COMPILE LINE ENTRY INTO THE HISTORY LIST ---
+        // Optimization check: Don't add duplicate back-to-back entries to keep history clean
+        if (commandHistory.Count == 0 || commandHistory[commandHistory.Count - 1] != cleanedInput)
+        {
+            commandHistory.Add(cleanedInput);
+        }
+        
+        // Reset the navigation index pointer back past the end of the list
+        historyIndex = commandHistory.Count;
 
         string[] inputPieces = cleanedInput.Split(' ');
         if (inputPieces.Length == 0) return;
 
         string mainCommand = inputPieces[0].ToLower();
-        string commandArguments = inputPieces.Length > 1 ? inputPieces[1] : "";
+        
+        string commandArguments = "";
+        if (inputPieces.Length > 1)
+        {
+            commandArguments = cleanedInput.Substring(mainCommand.Length).Trim();
+        }
 
         switch (mainCommand)
         {
@@ -169,12 +423,33 @@ public class DevConsole : MonoBehaviour
                 ExecuteHelpCommand();
                 break;
 
-            case "money":
-                ExecuteMoneyCheat(commandArguments);
+            case "noclip":
+                ExecuteNoclipCommand();
                 break;
 
-            case "spawnfish":
-                ExecuteSpawnFishCheat();
+            case "timescale":
+                ExecuteTimescaleCommand(commandArguments);
+                break;
+
+            case "clearalgae":
+                ExecuteClearAlgaeCommand();
+                break;
+
+            case "growalgae":
+            case "growlagae": 
+                ExecuteGrowAlgaeCommand();
+                break;
+
+            case "spawn":
+                ExecuteSpawnCommand(commandArguments);
+                break;
+
+            case "delete":
+                ExecuteDeleteCommand();
+                break;
+
+            case "money":
+                ExecuteMoneyCheat(commandArguments);
                 break;
 
             case "clearitems":
@@ -194,6 +469,9 @@ public class DevConsole : MonoBehaviour
                 break;
         }
 
+        if (ghostTextMesh != null) ghostTextMesh.text = "";
+        currentSuggestion = "";
+
         if (isConsoleOpen && commandInputField != null)
         {
             commandInputField.text = "";
@@ -205,11 +483,160 @@ public class DevConsole : MonoBehaviour
     {
         Debug.Log("<b>=== DEV CONSOLE HELP REGISTRY ===</b>\n" +
                   "• <b>help</b> - Displays this active cheat command overview panel.\n" +
-                  "• <b>money <integer></b> - Adds cash to the global economy wallet.\n" +
-                  "• <b>spawnfish</b> - Instantiates a default test fish at the tank's center coordinates.\n" +
-                  "• <b>clearitems</b> - Instantly destroys all placed 3D items inside your shop container.\n" +
-                  "• <b>save</b> - Commits current finances, shop layouts, fish growth metrics, and algae nodes to file.\n" +
-                  "• <b>load</b> - Fully rebuilds your game state using your persistent file registry.");
+                  "• <b>noclip</b> - Toggles fly mode to pass through wall meshes and move out-of-bounds.\n" +
+                  "• <b>timescale <float></b> - Adjusts simulation flow speed (e.g., 'timescale 4' speeds up growth and algae cycles).\n" +
+                  "• <b>clearalgae</b> - Instantly clears away all green algae from every window node pane in the tank.\n" +
+                  "• <b>growalgae</b> - Forces every live fish currently swimming in the tank to expand its scale values.\n" +
+                  "• <b>spawn <asset_name></b> - Dynamic spawner matching exact filenames in both 2D Aquarium and 3D Storefront folders. 3D items activate ghost previews!\n" +
+                  "• <b>delete</b> - Smart target clear mode. Opens click-to-delete context tool for 2D tank items or triggers 3D Removal Mode system.\n" +
+                  "• <b>money <integer></b> - Adds cash into the centralized economy manager wallet tracking balance.\n" +
+                  "• <b>clearitems</b> - Instantly sweeps and deletes all placed 3D shop furniture elements.\n" +
+                  "• <b>save</b> - Commits finances, shop layouts, fish growth metrics, and algae nodes to local file.\n" +
+                  "• <b>load</b> - Completely rebuilds your multi-scene game status using your persistent file registry.");
+    }
+
+    private void ExecuteDeleteCommand()
+    {
+        AquariumManager aquariumManager = FindFirstObjectByType<AquariumManager>();
+        bool isViewingAquarium = (aquariumManager != null && aquariumManager.isTankVisible);
+
+        if (isViewingAquarium)
+        {
+            ToggleConsole();
+            isDevDeleting2D = true;
+            Debug.Log("<color=yellow>[Console Delete Mode]</color> 2D Aquarium Delete Active! Left-Click any fish, snail, decoration, or feeder to delete it. Algae panels are fully protected. Press Escape or Right-Click to leave.");
+        }
+        else
+        {
+            StorefrontRemovalSystem removalSystem = FindFirstObjectByType<StorefrontRemovalSystem>();
+            if (removalSystem != null)
+            {
+                ToggleConsole();
+                removalSystem.StartRemovalMode();
+            }
+            else
+            {
+                Debug.LogWarning("[Console] StorefrontRemovalSystem component could not be tracked in current scene contexts.");
+            }
+        }
+    }
+
+    private void ExecuteSpawnCommand(string argument)
+    {
+        string cleanedName = argument.Trim().ToLower();
+
+        if (string.IsNullOrEmpty(cleanedName))
+        {
+            Debug.LogWarning("[Console] Spawn command requires an asset name (e.g., 'spawn shelf' or 'spawn snail').");
+            return;
+        }
+
+        if (fishPrefabCache.TryGetValue(cleanedName, out GameObject target2DPrefab))
+        {
+            AquariumManager currentActiveTankManager = FindFirstObjectByType<AquariumManager>();
+            if (currentActiveTankManager != null)
+            {
+                currentActiveTankManager.SpawnBabyFish(target2DPrefab, Vector3.zero);
+                Debug.Log($"<color=cyan>[Console]</color> Successfully spawned custom fish type instance: <b>{target2DPrefab.name}</b> at tank center origin coordinates.");
+            }
+            else
+            {
+                Debug.LogWarning("[Console] No active AquariumManager found to handle 2D assets.");
+            }
+            return;
+        }
+
+        if (storefrontPrefabCache.TryGetValue(cleanedName, out GameObject target3DPrefab))
+        {
+            StorefrontPlacementSystem placementSystem = FindFirstObjectByType<StorefrontPlacementSystem>();
+            if (placementSystem != null)
+            {
+                ToggleConsole();
+                placementSystem.StartPlacement(target3DPrefab, 0);
+                Debug.Log($"<color=cyan>[Console]</color> Initiated 3D cheat placement mode for: <b>{target3DPrefab.name}</b> ($0).");
+            }
+            else
+            {
+                Debug.LogWarning("[Console] No active StorefrontPlacementSystem found to handle 3D objects.");
+            }
+            return;
+        }
+
+        Debug.LogError($"[Console] Spawn Failed. No prefab named '<b>{argument}</b>' found in AquariumPrefabs or StorefrontPrefabs directories.");
+    }
+
+    private void ExecuteTimescaleCommand(string argument)
+    {
+        if (float.TryParse(argument, out float scaleAmt))
+        {
+            Time.timeScale = Mathf.Clamp(scaleAmt, 0f, 100f);
+            Debug.Log($"[Console] Simulation speed set to: <b>{Time.timeScale}x normal speed</b>.");
+        }
+        else
+        {
+            Debug.LogWarning("[Console] Invalid entry. Format syntax requires a numeric value (e.g., 'timescale 3.5').");
+        }
+    }
+
+    private void ExecuteClearAlgaeCommand()
+    {
+        AlgaeManager algaeManager = FindFirstObjectByType<AlgaeManager>();
+        if (algaeManager != null && algaeManager.algaeNodes != null)
+        {
+            int nodesWiped = 0;
+            foreach (AlgaeNode node in algaeManager.algaeNodes)
+            {
+                if (node != null)
+                {
+                    node.InitializeAlgaeLevel(0f);
+                    nodesWiped++;
+                }
+            }
+            Debug.Log($"<color=green>[Console]</color> Glass sanitized! Cleaned <b>{nodesWiped}</b> tank surface points.");
+        }
+        else
+        {
+            Debug.LogWarning("[Console] Aborted. AlgaeManager component sequence arrays could not be resolved.");
+        }
+    }
+
+    private void ExecuteGrowAlgaeCommand()
+    {
+        NaturalFishAI[] activeFish = FindObjectsByType<NaturalFishAI>(FindObjectsSortMode.None);
+        if (activeFish != null && activeFish.Length > 0)
+        {
+            foreach (NaturalFishAI fish in activeFish)
+            {
+                if (fish != null)
+                {
+                    fish.currentScaleModifier += 0.25f;
+                    if (fish.currentScaleModifier > fish.maxScale)
+                    {
+                        fish.currentScaleModifier = fish.maxScale;
+                    }
+                    fish.UpdateFishScale(); 
+                }
+            }
+            Debug.Log($"<color=cyan>[Console]</color> Growth surge deployed. Boosted sizes across <b>{activeFish.Length}</b> active fish.");
+        }
+        else
+        {
+            Debug.LogWarning("[Console] Command skipped. No live fish instances found inside the tank boundaries.");
+        }
+    }
+
+    private void ExecuteNoclipCommand()
+    {
+        PlayerController3D player = FindFirstObjectByType<PlayerController3D>();
+        if (player != null)
+        {
+            bool noclipActive = player.ToggleNoclip();
+            Debug.Log($"[Console] Noclip flight mode: " + (noclipActive ? "<color=green>ACTIVE</color>" : "<color=red>INACTIVE</color>"));
+        }
+        else
+        {
+            Debug.LogWarning("[Console] Execution failed. 3D Player actor script could not be located.");
+        }
     }
 
     private void ExecuteMoneyCheat(string argument)
@@ -224,27 +651,15 @@ public class DevConsole : MonoBehaviour
         }
     }
 
-    private void ExecuteSpawnFishCheat()
-    {
-        AquariumManager currentActiveTankManager = FindFirstObjectByType<AquariumManager>();
-
-        if (currentActiveTankManager != null && currentActiveTankManager.fishPrefab != null)
-        {
-            currentActiveTankManager.SpawnBabyFish(currentActiveTankManager.fishPrefab, Vector3.zero);
-            Debug.Log("[Creature Spawner] Spawned extra cheat test fish directly at tank center origin point coordinates.");
-        }
-    }
-
     private void ExecuteClearStorefrontItemsCheat()
     {
-        GameObject placedContainer = GameObject.Find("--- PLACED 3D ITEMS ---");
-
-        if (placedContainer != null && placedContainer.transform.childCount > 0)
+        GameObject KaplanContainer = GameObject.Find("--- PLACED 3D ITEMS ---");
+        if (KaplanContainer != null && KaplanContainer.transform.childCount > 0)
         {
-            int structuralChildCount = placedContainer.transform.childCount;
+            int structuralChildCount = KaplanContainer.transform.childCount;
             for (int i = structuralChildCount - 1; i >= 0; i--)
             {
-                Destroy(placedContainer.transform.GetChild(i).gameObject);
+                Destroy(KaplanContainer.transform.GetChild(i).gameObject);
             }
             Debug.Log($"[Janitor Sweep] Swept and wiped clean all {structuralChildCount} active placed items.");
         }
