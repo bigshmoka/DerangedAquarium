@@ -215,14 +215,14 @@ public class DevConsole : MonoBehaviour
         autocompleteList.Add("growlagae");
         autocompleteList.Add("money");
         autocompleteList.Add("clearitems");
+        // --- INTEGRATED: NEW 2D BULK CLEANER REGISTRY KEY ---
+        autocompleteList.Add("clearitems2d");
         autocompleteList.Add("save");
         autocompleteList.Add("load");
         autocompleteList.Add("spawn");
         autocompleteList.Add("delete");
         autocompleteList.Add("clear");
         autocompleteList.Add("cls");
-        
-        // --- INTEGRATED: ADD NEW IN-GAME SYSTEM HOOKS ---
         autocompleteList.Add("quests");
         autocompleteList.Add("skipquest");
     }
@@ -420,7 +420,6 @@ public class DevConsole : MonoBehaviour
     {
         if (logDisplayText == null) return;
 
-        // --- RECURSION SHEILD: DROPS TEXT GLYPH ERRORS IMMEDIATELY ---
         if (logMessage.Contains("font asset") || logMessage.Contains("Unicode value") || logMessage.Contains("character with Unicode"))
         {
             return;
@@ -529,6 +528,11 @@ public class DevConsole : MonoBehaviour
                 ExecuteClearStorefrontItemsCheat();
                 break;
 
+            // --- INTEGRATED: REDIRECT INCOMING ROUTING TOKEN ---
+            case "clearitems2d":
+                ExecuteClear2DItemsCheat();
+                break;
+
             case "save":
                 if (SaveManager.Instance != null) SaveManager.Instance.SaveGame();
                 break;
@@ -567,6 +571,7 @@ public class DevConsole : MonoBehaviour
                   "• <b>delete</b> - Smart target clear mode. Opens click-to-delete context tool for 2D tank items or triggers 3D Removal Mode system.\n" +
                   "• <b>money <integer></b> - Adds cash into the centralized economy manager wallet tracking balance.\n" +
                   "• <b>clearitems</b> - Instantly sweeps and deletes all placed 3D shop furniture elements.\n" +
+                  "• <b>clearitems2d</b> - Instantly sweeps and deletes all placed 2D tank utilities (Feeders, Plants, Chests, Decor).\n" +
                   "• <b>save</b> - Commits finances, shop layouts, fish growth metrics, and algae nodes to local file.\n" +
                   "• <b>load</b> - Completely rebuilds your multi-scene game status using your persistent file registry.");
     }
@@ -579,7 +584,6 @@ public class DevConsole : MonoBehaviour
             return;
         }
 
-        // OUTPUT TIMER FORMATTING REMAINING TIME VALUES TO THE LOG VIEW WINDOW LAYER
         Debug.Log($"<b>=== ACTIVE TYCOON QUEST REGISTRY (Time Left: {QuestManager.Instance.GetTimeRemainingString()}) ===</b>");
         foreach (Quest q in QuestManager.Instance.activeQuests)
         {
@@ -591,7 +595,6 @@ public class DevConsole : MonoBehaviour
         }
     }
 
-    // --- NEW: THE INSTANT TESTING HARNESS EVENT SIMULATOR ---
     private void ExecuteSkipQuestCommand()
     {
         if (QuestManager.Instance == null)
@@ -851,5 +854,50 @@ public class DevConsole : MonoBehaviour
             }
             Debug.Log($"[Janitor Sweep] Swept and wiped clean all {structuralChildCount} active placed items.");
         }
+    }
+
+    // --- NEW: THE 2D BULK TANK UTILITIES PURGE CLEANER ---
+    private void ExecuteClear2DItemsCheat()
+    {
+        AquariumManager tankManager = FindFirstObjectByType<AquariumManager>();
+        if (tankManager == null)
+        {
+            Debug.LogWarning("[Console] Aborted. AquariumManager component could not be tracked in current memory nodes.");
+            return;
+        }
+
+        int objectsPurgedCount = 0;
+
+        // Loop backward through the direct hierarchy children tree branch of the 2D manager to avoid index skips
+        for (int i = tankManager.transform.childCount - 1; i >= 0; i--)
+        {
+            Transform childNode = tankManager.transform.GetChild(i);
+
+            // CRITICAL SANITY FILTER SHIELDS: Ensure we do NOT vaporize living creature mechanics!
+            bool isFishEntity = childNode.GetComponent<NaturalFishAI>() != null || childNode.name.ToLower().Contains("fish");
+            bool isSnailEntity = childNode.GetComponent<SnailAI>() != null || childNode.name.ToLower().Contains("snail");
+            
+            // Protect structural system folder paths (like your runtime food/bubble container parent objects)
+            bool isSystemFolder = childNode.name.Contains("---");
+
+            // Isolate Target Classes: Clear out automated mechanics, decorations, or shop placement profiles
+            bool isTargetUtilityItem = childNode.GetComponent<AutoFeeder>() != null ||
+                                       childNode.GetComponent<TreasureChest>() != null ||
+                                       childNode.GetComponent<LivePlant>() != null ||
+                                       childNode.name.Contains("_Placed") ||
+                                       childNode.name.ToLower().Contains("feeder") ||
+                                       childNode.name.ToLower().Contains("plant") ||
+                                       childNode.name.ToLower().Contains("chest") ||
+                                       childNode.name.ToLower().Contains("decor") ||
+                                       childNode.name.ToLower().Contains("item");
+
+            if (!isFishEntity && !isSnailEntity && !isSystemFolder && isTargetUtilityItem)
+            {
+                Destroy(childNode.gameObject);
+                objectsPurgedCount++;
+            }
+        }
+
+        Debug.Log($"<color=green>[Janitor Sweep 2D]</color> Vaporized <b>{objectsPurgedCount}</b> active items, auto feeders, chests, and plants from the aquarium tank structure.");
     }
 }
