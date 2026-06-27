@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections;
 using System.Collections.Generic;
 
 [System.Serializable]
@@ -34,6 +35,7 @@ public class QuestManager : MonoBehaviour
     public List<Quest> activeQuests = new List<Quest>();
 
     private int currentChainIndex = 0;
+    private bool isTransitioningQuest = false; // Prevents double-triggering during the 1-second delay window
 
     void Awake()
     {
@@ -97,6 +99,9 @@ public class QuestManager : MonoBehaviour
 
     public void ProgressQuest(string id, int amount)
     {
+        // Block new progress from coming in while we are waiting out our 1-second "COMPLETE" screen delay
+        if (isTransitioningQuest) return;
+
         foreach (Quest q in activeQuests)
         {
             if (q.questID == id && !q.isCompleted)
@@ -125,12 +130,25 @@ public class QuestManager : MonoBehaviour
             Debug.Log($"[Quest Reward] +${q.cashReward} deposited.");
         }
 
-        // ADVANCE THE TIMELINE INDEX ROW AND POP THE NEXT OBJECTIVE INSTANTLY
-        currentChainIndex++;
-        LoadCurrentQuestFromChain();
+        // --- NEW: START THE 1-SECOND DELAY TIMING ENGINE ---
+        // Instead of instantly loading the next quest, start our coroutine timer clock!
+        StartCoroutine(DelayedNextQuestTransition());
     }
 
-    // This allows your developer console's 'skipday' command to act as an instant skip tool!
+    private IEnumerator DelayedNextQuestTransition()
+    {
+        isTransitioningQuest = true;
+        
+        // Wait on the game clock for exactly 1.0 seconds
+        yield return new WaitForSeconds(1.0f);
+        
+        currentChainIndex++;
+        LoadCurrentQuestFromChain();
+        
+        isTransitioningQuest = false;
+    }
+
+    // This allows your developer console's 'skipquest' command to act as an instant skip tool!
     public void RotateDailyQuests()
     {
         if (currentChainIndex < masterQuestChain.Count)
