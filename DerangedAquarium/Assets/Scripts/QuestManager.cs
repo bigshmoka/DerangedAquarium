@@ -26,6 +26,10 @@ public class QuestManager : MonoBehaviour
 {
     public static QuestManager Instance;
 
+    // --- NEW: THE GLOBAL EVENT BROADCAST NETWORK CHANNEL ---
+    // Any UI text component script anywhere in the project can tune into this channel to play animation bursts
+    public static System.Action OnQuestRewardPaid;
+
     [Header("Campaign Storyline Chain")]
     [Tooltip("Design your sequential timeline of story milestones here! Drag, drop, add, or delete elements directly inside the editor.")]
     public List<Quest> masterQuestChain = new List<Quest>();
@@ -35,7 +39,7 @@ public class QuestManager : MonoBehaviour
     public List<Quest> activeQuests = new List<Quest>();
 
     private int currentChainIndex = 0;
-    private bool isTransitioningQuest = false; // Prevents double-triggering during the 1-second delay window
+    private bool isTransitioningQuest = false; 
 
     void Awake()
     {
@@ -99,7 +103,6 @@ public class QuestManager : MonoBehaviour
 
     public void ProgressQuest(string id, int amount)
     {
-        // Block new progress from coming in while we are waiting out our 1-second "COMPLETE" screen delay
         if (isTransitioningQuest) return;
 
         foreach (Quest q in activeQuests)
@@ -112,7 +115,6 @@ public class QuestManager : MonoBehaviour
                 if (q.currentCount >= q.targetCount)
                 {
                     CompleteQuest(q);
-                    // Break out of the loop instantly so we don't evaluate a collection that was just modified by LoadCurrentQuestFromChain!
                     break; 
                 }
             }
@@ -130,8 +132,10 @@ public class QuestManager : MonoBehaviour
             Debug.Log($"[Quest Reward] +${q.cashReward} deposited.");
         }
 
-        // --- NEW: START THE 1-SECOND DELAY TIMING ENGINE ---
-        // Instead of instantly loading the next quest, start our coroutine timer clock!
+        // --- NEW: BROADCAST THE VISUAL POP COMMAND SIGNAL ---
+        // Tells all listening money text elements to instantly pop up and scale down!
+        OnQuestRewardPaid?.Invoke();
+
         StartCoroutine(DelayedNextQuestTransition());
     }
 
@@ -139,7 +143,6 @@ public class QuestManager : MonoBehaviour
     {
         isTransitioningQuest = true;
         
-        // Wait on the game clock for exactly 1.0 seconds
         yield return new WaitForSeconds(1.0f);
         
         currentChainIndex++;
@@ -148,7 +151,6 @@ public class QuestManager : MonoBehaviour
         isTransitioningQuest = false;
     }
 
-    // This allows your developer console's 'skipquest' command to act as an instant skip tool!
     public void RotateDailyQuests()
     {
         if (currentChainIndex < masterQuestChain.Count)
@@ -159,7 +161,6 @@ public class QuestManager : MonoBehaviour
         }
     }
 
-    // Repurposed string handler prevents your console screen UI code from throwing script reference errors
     public string GetTimeRemainingString()
     {
         if (currentChainIndex >= masterQuestChain.Count) return "CAMPAIGN COMPLETED";
