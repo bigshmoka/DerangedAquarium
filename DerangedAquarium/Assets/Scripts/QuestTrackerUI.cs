@@ -7,9 +7,14 @@ public class QuestTrackerUI : MonoBehaviour
     [Tooltip("Drag the TextMeshPro component that will print the objective text here.")]
     public TMP_Text questDisplayText;
 
+    // --- OPTIMIZATION FIELD CACHES ---
+    // Stores historical data footprints to completely eliminate redundant per-frame string allocations
+    private int lastRecordedCount = -1;
+    private bool lastRecordedCompletionState = false;
+    private string lastRecordedDescription = "";
+
     void Start()
     {
-        // Fallback auto-assignment: if forgotten in the inspector, grab the component directly
         if (questDisplayText == null)
         {
             questDisplayText = GetComponent<TMP_Text>();
@@ -18,21 +23,32 @@ public class QuestTrackerUI : MonoBehaviour
 
     void Update()
     {
-        // Safety guard: Don't execute if the text field or the manager aren't active yet
         if (QuestManager.Instance == null || questDisplayText == null)
         {
             return;
         }
 
-        // Pull the live active quest list from the master system authority blueprint
         if (QuestManager.Instance.activeQuests != null && QuestManager.Instance.activeQuests.Count > 0)
         {
             Quest currentQuest = QuestManager.Instance.activeQuests[0];
 
+            // OPTIMIZED GATE: Check if any tracking metrics changed before executing string generations
+            if (currentQuest.currentCount == lastRecordedCount && 
+                currentQuest.isCompleted == lastRecordedCompletionState && 
+                currentQuest.description == lastRecordedDescription &&
+                questDisplayText.text != "")
+            {
+                return; // Memory footprint bypass: Zero garbage generated!
+            }
+
+            // Update baseline caches
+            lastRecordedCount = currentQuest.currentCount;
+            lastRecordedCompletionState = currentQuest.isCompleted;
+            lastRecordedDescription = currentQuest.description;
+
             // Condition 1: If the player has finished the entire sequence chain game database array
             if (currentQuest.questID == "completed")
             {
-                // FIXED: Removed the 🥇 gold medal emoji entirely to guarantee zero font rendering errors
                 questDisplayText.text = "<b><color=#55FF55>CAMPAIGN BEATEN!</color></b>\n" +
                                         "<size=85%>All chapters cleared. Enjoy your Sandbox Aquarium!</size>";
             }
@@ -54,7 +70,10 @@ public class QuestTrackerUI : MonoBehaviour
         }
         else
         {
-            questDisplayText.text = "Searching for active quest updates...";
+            if (questDisplayText.text != "Searching for active quest updates...")
+            {
+                questDisplayText.text = "Searching for active quest updates...";
+            }
         }
     }
 }

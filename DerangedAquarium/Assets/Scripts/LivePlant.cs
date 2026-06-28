@@ -20,7 +20,6 @@ public class LivePlant : MonoBehaviour
     private SpriteRenderer spriteRenderer;
     private AlgaeManager algaeManager;
     
-    // --- NEW LOGIC FOR ANTI-SPAM LOGS ---
     private bool lastFrameHealthy = true;
 
     void Start()
@@ -37,21 +36,25 @@ public class LivePlant : MonoBehaviour
 
         bool foundAlgaeChoke = false;
         
-        AlgaeNode[] allNodes = FindObjectsByType<AlgaeNode>(FindObjectsSortMode.None);
-        foreach (AlgaeNode node in allNodes)
+        // OPTIMIZED SCAN ENGINE ROUTINE: Loops directly over your manager's array cache nodes
+        if (algaeManager.algaeNodes != null)
         {
-            float distance = Vector3.Distance(transform.position, node.transform.position);
-            if (distance <= searchRadius && node.currentAlgaeLevel > algaeChokeThreshold)
+            foreach (AlgaeNode node in algaeManager.algaeNodes)
             {
-                foundAlgaeChoke = true;
-                break;
+                if (node == null) continue;
+
+                float distance = Vector3.Distance(transform.position, node.transform.position);
+                if (distance <= searchRadius && node.currentAlgaeLevel > algaeChokeThreshold)
+                {
+                    foundAlgaeChoke = true;
+                    break; // Break out immediately upon first positive detection
+                }
             }
         }
 
         isHealthy = !foundAlgaeChoke;
 
-        // --- ANTI-SPAM CONDITIONAL DEBUG LOGS ---
-        // Only print a console log the exact single frame the health state shifts!
+        // ANTI-SPAM CONDITIONAL DEBUG LOGS
         if (isHealthy != lastFrameHealthy)
         {
             if (!isHealthy)
@@ -63,7 +66,7 @@ public class LivePlant : MonoBehaviour
                 Debug.Log($"<color=green>[Ecosystem] {gameObject.name} is now CLEAN and healthy!</color> (Hunger buff restored)");
             }
             
-            lastFrameHealthy = isHealthy; // Save the updated state
+            lastFrameHealthy = isHealthy; 
         }
 
         if (spriteRenderer != null)
