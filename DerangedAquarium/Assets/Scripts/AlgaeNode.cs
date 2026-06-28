@@ -41,7 +41,7 @@ public class AlgaeNode : MonoBehaviour
         
         if (manager == null)
         {
-            Debug.LogError($"[Algae Error] {gameObject.name} in {gameObject.scene.name} cannot find its AquariumManager!");
+            Debug.LogError($"<color=red>[Algae Hierarchy Error]</color> Node asset <b>{gameObject.name}</b> can't locate an AquariumManager script component anywhere in its parent tree layout branch!");
             return;
         }
 
@@ -53,10 +53,13 @@ public class AlgaeNode : MonoBehaviour
                 if (currentAlgaeLevel < 0f) currentAlgaeLevel = 0f;
                 UpdateVisuals();
                 
-                // RESTORED: Debug Log for Scrubbing
-                Debug.Log($"<color=cyan>[Algae Clean]</color> Scrubbed 30% from {gameObject.name} in <b>{manager.tankID}</b>. New Level: {currentAlgaeLevel:F2}");
+                // RESTORED: Cleaning Success Metric Diagnostic Log
+                Debug.Log($"<color=cyan>[Sponge Scrub]</color> Wiped node <b>{gameObject.name}</b> in container <b>{manager.tankID}</b>! Current dirty accumulation level dropped to: <b>{currentAlgaeLevel:P0}</b>.");
 
-                if (QuestManager.Instance != null) QuestManager.Instance.ProgressQuest("clean_algae", 1);
+                if (QuestManager.Instance != null)
+                {
+                    QuestManager.Instance.ProgressQuest("clean_algae", 1);
+                }
             }
         }
     }

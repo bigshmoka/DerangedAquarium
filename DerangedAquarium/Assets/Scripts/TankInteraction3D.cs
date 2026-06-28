@@ -4,9 +4,11 @@ using UnityEngine.SceneManagement;
 public class TankInteraction3D : MonoBehaviour
 {
     [Header("Scene Configuration")]
+    [Tooltip("The EXACT string name of your existing 2D Aquarium scene file.")]
     public string aquariumSceneName = "AquariumScene";
 
     [Header("Tank Multi-Instance Tracking")]
+    [Tooltip("Give this specific physical 3D prop a unique ID that matches its 2D simulation counterpart.")]
     public string tankID = "StarterTank";
 
     [Header("UI Prompt")]
@@ -28,6 +30,7 @@ public class TankInteraction3D : MonoBehaviour
         if (!aquariumScene.isLoaded && !isSceneLoading)
         {
             isSceneLoading = true;
+            Debug.Log($"<color=yellow>[Scene Loader]</color> Initialization sweep: Loading additive scene <b>{aquariumSceneName}</b>...");
             SceneManager.LoadScene(aquariumSceneName, LoadSceneMode.Additive);
             StartCoroutine(InitializeTankVisibilityOnStart());
         }
@@ -43,7 +46,6 @@ public class TankInteraction3D : MonoBehaviour
         while (!aquariumScene.isLoaded) yield return null;
         yield return new WaitForEndOfFrame();
 
-        // ONLY disable Cameras and Canvases on boot. Let the art meshes stay on since they are spaced far apart!
         foreach (GameObject rootObj in aquariumScene.GetRootGameObjects())
         {
             foreach (Canvas c in rootObj.GetComponentsInChildren<Canvas>(true)) c.enabled = false;
@@ -71,8 +73,14 @@ public class TankInteraction3D : MonoBehaviour
             if (manager != null && manager.tankID == this.tankID)
             {
                 myPaired2DManager = manager;
+                Debug.Log($"<color=green>[Link Success]</color> Physical 3D Prop <b>{gameObject.name}</b> successfully linked to 2D Manager for <b>{tankID}</b>!");
                 break;
             }
+        }
+
+        if (myPaired2DManager == null)
+        {
+            Debug.LogError($"<color=red>[Link Failure]</color> Physical 3D Prop <b>{gameObject.name}</b> could not find a matching 2D manager with tankID: '{tankID}'!");
         }
     }
 
@@ -85,6 +93,8 @@ public class TankInteraction3D : MonoBehaviour
     void EnterAquariumView()
     {
         isViewingTank = true;
+        Debug.Log($"<color=cyan>[View State]</color> Opening view for: <b>{tankID}</b>. Shifting camera matrices and freeing system cursor.");
+
         if (pressEPromptUI != null) pressEPromptUI.SetActive(false);
         if (localPlayer != null) localPlayer.SetPlayerLockState(true);
         if (Camera.main != null) Camera.main.gameObject.SetActive(false);
@@ -101,6 +111,8 @@ public class TankInteraction3D : MonoBehaviour
     void ExitAquariumView()
     {
         isViewingTank = false;
+        Debug.Log($"<color=cyan>[View State]</color> Closing view for: <b>{tankID}</b>. Restoring 3D Player viewport and locking mouse controller.");
+
         if (localPlayer == null) localPlayer = FindFirstObjectByType<PlayerController3D>();
 
         if (localPlayer != null)
@@ -120,29 +132,30 @@ public class TankInteraction3D : MonoBehaviour
 
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
+        
+        if (pressEPromptUI != null && isPlayerNearby) pressEPromptUI.SetActive(true);
     }
 
-    // =========================================================
-    // --- THE FIX: THE GLOBAL SLEDGEHAMMER ---
-    // =========================================================
     void Toggle2DAquariumVisibility(bool makeVisible)
     {
         if (myPaired2DManager == null) LocateMyPaired2DManager();
         if (myPaired2DManager == null) return;
 
-        // 1. If we are turning ON a tank, aggressively turn OFF every other tank in the entire game first.
+        // Aggressive background shielding loop
         if (makeVisible)
         {
             AquariumManager[] allManagers = FindObjectsByType<AquariumManager>(FindObjectsSortMode.None);
             foreach (AquariumManager mgr in allManagers)
             {
-                mgr.isTankVisible = false;
-                if (mgr.tankCamera != null) mgr.tankCamera.enabled = false;
-                if (mgr.mainTankCanvas != null) mgr.mainTankCanvas.enabled = false;
+                if (mgr != myPaired2DManager)
+                {
+                    mgr.isTankVisible = false;
+                    if (mgr.tankCamera != null) mgr.tankCamera.enabled = false;
+                    if (mgr.mainTankCanvas != null) mgr.mainTankCanvas.enabled = false;
+                }
             }
         }
 
-        // 2. Now definitively turn ON (or OFF) this specific tank's Explicit Links
         myPaired2DManager.isTankVisible = makeVisible;
 
         if (myPaired2DManager.tankCamera != null) 
@@ -150,16 +163,28 @@ public class TankInteraction3D : MonoBehaviour
 
         if (myPaired2DManager.mainTankCanvas != null) 
             myPaired2DManager.mainTankCanvas.enabled = makeVisible;
+
+        foreach (Renderer r in myPaired2DManager.GetComponentsInChildren<Renderer>(true)) 
+        {
+            r.enabled = makeVisible;
+        }
+
+        Debug.Log($"<color=magenta>[Visibility System]</color> Forced explicit assets for <b>{tankID}</b> to: <b>{makeVisible}</b>");
     }
 
     void OnTriggerEnter(Collider other)
     {
         PlayerController3D player = other.GetComponent<Collider>().GetComponent<PlayerController3D>();
         if (player == null) player = other.GetComponentInParent<PlayerController3D>();
+
         if (player != null)
         {
             isPlayerNearby = true;
             localPlayer = player;
+            
+            // RESTORED: Entering Range Diagnostic Log
+            Debug.Log($"<color=green>[Trigger Zone]</color> Player entered proximity radius of 3D Prop for tank: <b>{tankID}</b>. Prompting UI overlay display.");
+            
             if (pressEPromptUI != null && !isViewingTank) pressEPromptUI.SetActive(true);
         }
     }
@@ -168,9 +193,14 @@ public class TankInteraction3D : MonoBehaviour
     {
         PlayerController3D player = other.GetComponent<Collider>().GetComponent<PlayerController3D>();
         if (player == null) player = other.GetComponentInParent<PlayerController3D>();
+
         if (player != null)
         {
             isPlayerNearby = false;
+            
+            // RESTORED: Leaving Range Diagnostic Log
+            Debug.Log($"<color=orange>[Trigger Zone]</color> Player exited proximity radius of 3D Prop for tank: <b>{tankID}</b>. Suppressing UI overlay display.");
+            
             if (!isViewingTank) localPlayer = null;
             if (pressEPromptUI != null) pressEPromptUI.SetActive(false);
         }
