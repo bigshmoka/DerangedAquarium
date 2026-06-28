@@ -12,15 +12,6 @@ public class StorefrontPlacementSystem : MonoBehaviour
     [Header("Rotation Keybinds")]
     public KeyCode rotateHotkey = KeyCode.R;
 
-    // ===================================================================
-    // --- NEW: MANUAL HEIGHT ADJUSTMENT SLIDER HANDLE ---
-    // Exposes a slider in your Unity Inspector to easily raise or lower 
-    // placement objects manually if their mesh models clip the floor!
-    // ===================================================================
-    [Header("Manual Adjustment Tweaks")]
-    [Tooltip("Manually add a vertical offset value if your prefab model clips or sinks through the floor mesh.")]
-    public float manualHeightOffset = 0f;
-
     private GameObject ghostPreviewInstance;
     private GameObject selectedPrefab;
     private int currentItemCost;
@@ -49,6 +40,7 @@ public class StorefrontPlacementSystem : MonoBehaviour
     {
         if (prefab == null) return;
 
+        // --- UNIQUE INSTANCE PRE-PLACEMENT LOCKOUT CHECK ---
         TankInteraction3D tankComp = prefab.GetComponentInChildren<TankInteraction3D>();
         if (tankComp != null && tankComp.tankID != "Unassigned_Tank")
         {
@@ -57,10 +49,11 @@ public class StorefrontPlacementSystem : MonoBehaviour
             {
                 if (existing.tankID == tankComp.tankID)
                 {
-                    Debug.LogWarning($"<color=red>[Placement Block]</color> Placement Aborted! A unique fish tank with variation ID '<b>{tankComp.tankID}</b>' already exists inside your showroom layout registry!");
-                    
-                    StorefrontShopUI shopUI = FindFirstObjectByType<StorefrontShopUI>();
-                    if (shopUI != null) shopUI.ForceCloseShop();
+                    StorefrontShopUI shopUIInstance = FindFirstObjectByType<StorefrontShopUI>();
+                    if (shopUIInstance != null)
+                    {
+                        shopUIInstance.TriggerNotificationAlert($"You already own unique aquarium variant '<b>{tankComp.tankID}</b>'!");
+                    }
                     return;
                 }
             }
@@ -72,8 +65,8 @@ public class StorefrontPlacementSystem : MonoBehaviour
             removalSystem.ExitRemovalMode();
         }
 
-        StorefrontShopUI shopUIInstance = FindFirstObjectByType<StorefrontShopUI>();
-        if (shopUIInstance != null) shopUIInstance.ForceCloseShop();
+        StorefrontShopUI shopUI = FindFirstObjectByType<StorefrontShopUI>();
+        if (shopUI != null) shopUI.ForceCloseShop();
 
         selectedPrefab = prefab;
         currentItemCost = cost;
@@ -91,6 +84,7 @@ public class StorefrontPlacementSystem : MonoBehaviour
             col.enabled = false;
         }
 
+        // --- PREVIEW PROTECTION SHIELD ---
         TankInteraction3D ghostTankComp = ghostPreviewInstance.GetComponentInChildren<TankInteraction3D>();
         if (ghostTankComp != null)
         {
@@ -119,24 +113,27 @@ public class StorefrontPlacementSystem : MonoBehaviour
         Ray cameraRay = new Ray(Camera.main.transform.position, Camera.main.transform.forward);
         RaycastHit surfaceHit;
 
+        // ===================================================================
+        // --- FIXED: MODULAR PER-PREFAB HEIGHT OFFSET DETECTION ---
+        // Searches the selected ghost structure for our new modular script.
+        // If present, it extracts the custom offset; otherwise, it defaults to 0f.
+        // ===================================================================
+        float localPrefabOffset = 0f;
+        PlacementHeightOffset offsetComp = ghostPreviewInstance.GetComponent<PlacementHeightOffset>();
+        if (offsetComp == null) offsetComp = ghostPreviewInstance.GetComponentInChildren<PlacementHeightOffset>();
+        if (offsetComp != null) localPrefabOffset = offsetComp.heightOffset;
+
         if (Physics.Raycast(cameraRay, out surfaceHit, maxPlacementDistance, floorSurfaceLayer))
         {
             ghostPreviewInstance.SetActive(true);
-            ghostPreviewInstance.transform.position = surfaceHit.point;
             
-            // Align rotation with surface vectors
+            // Apply raycast hit position combined with your custom asset offset
+            ghostPreviewInstance.transform.position = surfaceHit.point + new Vector3(0f, localPrefabOffset, 0f);
+            
             Quaternion floorSlopeAlignment = Quaternion.FromToRotation(Vector3.up, surfaceHit.normal);
             Quaternion playerRotationOffset = Quaternion.Euler(0f, customRotationY, 0f);
             
             ghostPreviewInstance.transform.rotation = floorSlopeAlignment * playerRotationOffset;
-
-            // --- FIXED: ADDED MANUAL VERTICAL MODIFIER CO-ORDINATES ---
-            Renderer ghostRend = ghostPreviewInstance.GetComponentInChildren<Renderer>();
-            if (ghostRend != null)
-            {
-                float shortFallOffset = surfaceHit.point.y - ghostRend.bounds.min.y;
-                ghostPreviewInstance.transform.position += new Vector3(0f, shortFallOffset + manualHeightOffset, 0f);
-            }
         }
         else
         {
@@ -147,20 +144,14 @@ public class StorefrontPlacementSystem : MonoBehaviour
             if (Physics.Raycast(downRay, out downHit, 25f, floorSurfaceLayer))
             {
                 ghostPreviewInstance.SetActive(true);
-                ghostPreviewInstance.transform.position = downHit.point;
+                
+                // Apply fallback ground hit position combined with your custom asset offset
+                ghostPreviewInstance.transform.position = downHit.point + new Vector3(0f, localPrefabOffset, 0f);
                 
                 Quaternion floorSlopeAlignment = Quaternion.FromToRotation(Vector3.up, downHit.normal);
                 Quaternion playerRotationOffset = Quaternion.Euler(0f, customRotationY, 0f);
                 
                 ghostPreviewInstance.transform.rotation = floorSlopeAlignment * playerRotationOffset;
-
-                // --- FIXED: ADDED MANUAL VERTICAL MODIFIER FOR FALLBACK SURFACE TRACKING ---
-                Renderer ghostRend = ghostPreviewInstance.GetComponentInChildren<Renderer>();
-                if (ghostRend != null)
-                {
-                    float shortFallOffset = downHit.point.y - ghostRend.bounds.min.y;
-                    ghostPreviewInstance.transform.position += new Vector3(0f, shortFallOffset + manualHeightOffset, 0f);
-                }
             }
             else
             {
@@ -184,7 +175,11 @@ public class StorefrontPlacementSystem : MonoBehaviour
 
                 if (existing.tankID == tankComp.tankID)
                 {
-                    Debug.LogWarning($"<color=red>[Placement Block]</color> Double validation breach! Tank variation ID '<b>{tankComp.tankID}</b>' already occupies a physical showroom asset layout!");
+                    StorefrontShopUI shopUI = FindFirstObjectByType<StorefrontShopUI>();
+                    if (shopUI != null)
+                    {
+                        shopUI.TriggerNotificationAlert($"You already own unique aquarium variant '<b>{tankComp.tankID}</b>'!");
+                    }
                     CancelPlacement();
                     return;
                 }

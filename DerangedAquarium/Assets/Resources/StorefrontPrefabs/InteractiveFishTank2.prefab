@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 1828933262210551997}
   - component: {fileID: 253460266155690021}
   - component: {fileID: 9007077659813594994}
+  - component: {fileID: -5342137486289175449}
   m_Layer: 0
   m_Name: InteractiveFishTank2
   m_TagString: Untagged
@@ -129,6 +130,19 @@ MonoBehaviour:
   aquariumSceneName: AquariumScene
   tankID: Tank2
   pressEPromptUI: {fileID: 0}
+--- !u!114 &-5342137486289175449
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2450256906227912132}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ce65183e8855fb04187a1bfe179686fc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlacementHeightOffset
+  heightOffset: 1.5
 --- !u!1 &6442895007768939063
 GameObject:
   m_ObjectHideFlags: 0
