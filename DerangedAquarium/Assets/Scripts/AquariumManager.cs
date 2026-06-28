@@ -26,9 +26,9 @@ public class AquariumManager : MonoBehaviour
     public TMP_Text spongeToolText;     
 
     // ===================================================================
-    // --- FIXED: AUTOMATED VIEW-STATE FLUSH PROPERTY ---
-    // Intercepts exit sequences. The exact frame you hit 'Q', it forces
-    // the shop closed, triggering the tab to smoothly slide away!
+    // --- RESTORED & UPGRADED: VIEW-STATE PROPERTY LAYER ---
+    // Tracks visibility. When set to false by your 3D interaction scripts,
+    // it automatically commands the UI to flush its tool highlights clean.
     // ===================================================================
     private bool _isTankVisible = false;
     [HideInInspector] 
@@ -45,6 +45,9 @@ public class AquariumManager : MonoBehaviour
             }
         }
     }
+
+    // --- RESTORED: LOAD SYSTEM DUPLICATION GUARD ---
+    [HideInInspector] public bool skipDefaultSpawn = false;
 
     [Header("Multi-Tank Core Settings")]
     public string tankID = "StarterTank";
@@ -63,6 +66,7 @@ public class AquariumManager : MonoBehaviour
     private TankPlacementSystem placementSystem;
     private TankInputHandler inputHandler;
 
+    // --- RESTORED FROM ORIGINAL "SCRIPTS" ASSET ---
     public int totalMoney {
         get { return economy != null ? economy.totalMoney : totalMoneySetting; }
         set { 
@@ -72,6 +76,8 @@ public class AquariumManager : MonoBehaviour
             } 
         }
     }
+    
+    // --- RESTORED FROM ORIGINAL "SCRIPTS" ASSET ---
     public bool isShopOpen {
         get { return shopUI != null ? shopUI.isShopOpen : false; }
         set { if (shopUI != null) shopUI.isShopOpen = value; }
@@ -79,6 +85,7 @@ public class AquariumManager : MonoBehaviour
 
     void Awake()
     {
+        // Internal structural component initialization mappings
         economy = gameObject.GetComponent<TankEconomy>() ?? gameObject.AddComponent<TankEconomy>();
         shopUI = gameObject.GetComponent<TankShopUI>() ?? gameObject.AddComponent<TankShopUI>();
         hierarchyTracker = gameObject.GetComponent<TankHierarchyTracker>() ?? gameObject.AddComponent<TankHierarchyTracker>();
@@ -87,6 +94,7 @@ public class AquariumManager : MonoBehaviour
 
         if (algaeManager == null) algaeManager = GetComponentInChildren<AlgaeManager>();
 
+        // Wire window component profiles up straight to the UI handler
         shopUI.shopMenuWindow = shopMenuWindow;
         shopUI.moneyText = moneyText;
         shopUI.errorNotificationText = errorNotificationText;
@@ -101,29 +109,22 @@ public class AquariumManager : MonoBehaviour
         placementSystem.Initialize(economy, shopUI);
         inputHandler.Initialize(shopUI, placementSystem, hierarchyTracker);
 
-        // ===================================================================
-        // --- FIXED: CROSS-TANK EXPLICIT REFERENCE INJECTION ---
-        // Automatically locates the ShopClickTab script within this tank's canvas
-        // and injects itself. This cleanly stops sibling components from cross-talking!
-        // ===================================================================
+        // --- RESTORED: MULTI-TANK AUTOMATED LINK INJECTION ---
         if (mainTankCanvas != null)
         {
             ShopClickTab localTab = mainTankCanvas.GetComponentInChildren<ShopClickTab>(true);
             if (localTab != null)
             {
                 localTab.aquariumManager = this;
-                
-                // Keep the window container awake so it can translate positions cleanly
-                if (shopMenuWindow != null)
-                {
-                    shopMenuWindow.SetActive(true);
-                }
+                if (shopMenuWindow != null) shopMenuWindow.SetActive(true);
             }
         }
 
+        // Safety validations to ensure layout assemblies aren't missing assignments
         if (tankCamera == null) Debug.LogError($"[Tank Fix] You forgot to drag the Camera into the {gameObject.name} manager!");
         if (mainTankCanvas == null) Debug.LogError($"[Tank Fix] You forgot to drag the Canvas into the {gameObject.name} manager!");
 
+        // Put expansion modules to sleep on frame zero to save system performance
         if (tankID != "StarterTank")
         {
             gameObject.SetActive(false);
@@ -146,7 +147,8 @@ public class AquariumManager : MonoBehaviour
 
         if (errorNotificationText != null) errorNotificationText.gameObject.SetActive(false);
 
-        if (fishPrefab != null)
+        // --- RESTORED: INDEPENDENT SPAWNING MATRIX WITH LOAD SHIELDING ---
+        if (!skipDefaultSpawn && fishPrefab != null)
         {
             SpawnBabyFish(fishPrefab, new Vector3(-2f, 0f, 0f));
             SpawnBabyFish(fishPrefab, new Vector3(0f, 2f, 0f));
@@ -162,6 +164,7 @@ public class AquariumManager : MonoBehaviour
         if (aqLayerIndex != -1) EnsureLayerRecursive(this.gameObject, aqLayerIndex);
     }
 
+    // --- RESTORED FROM ORIGINAL "SCRIPTS" ASSET ---
     private void EnsureLayerRecursive(GameObject obj, int newLayer)
     {
         if (obj.layer == LayerMask.NameToLayer("UI")) return;
@@ -169,6 +172,7 @@ public class AquariumManager : MonoBehaviour
         foreach (Transform child in obj.transform) EnsureLayerRecursive(child.gameObject, newLayer);
     }
 
+    // --- RESTORED FROM ORIGINAL "SCRIPTS" ASSET ---
     private void SetLayerRecursive(GameObject obj, int newLayer)
     {
         if (obj.layer == LayerMask.NameToLayer("UI")) return;
@@ -176,6 +180,7 @@ public class AquariumManager : MonoBehaviour
         foreach (Transform child in obj.transform) SetLayerRecursive(child.gameObject, newLayer);
     }
 
+    // --- RESTORED FROM ORIGINAL "SCRIPTS" ASSET ---
     private void ApplyCameraCullingFilters()
     {
         int aqLayerIndex = LayerMask.NameToLayer("Aquarium");
@@ -183,7 +188,7 @@ public class AquariumManager : MonoBehaviour
 
         int uiLayerIndex = LayerMask.NameToLayer("UI");
 
-        Camera[] allCameras = FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        Camera[] allCameras = FindObjectsByType<Camera>(FindObjectsSortMode.None);
         foreach (Camera cam in allCameras)
         {
             if (cam.orthographic && (cam.name.Contains("Aquarium") || cam.name.Contains("Tank") || (cam.cullingMask & (1 << aqLayerIndex)) != 0))
@@ -195,61 +200,73 @@ public class AquariumManager : MonoBehaviour
         }
     }
 
+    // --- RESTORED FROM ORIGINAL "SCRIPTS" ASSET ---
     public void UpdateMoneyUI()
     {
         if (economy != null) economy.UpdateBalanceUI();
     }
 
+    // --- RESTORED FROM ORIGINAL "SCRIPTS" ASSET ---
     public bool IsSpongeToolActive()
     {
         return shopUI != null && shopUI.isSpongeToolActive;
     }
 
+    // --- RESTORED FROM ORIGINAL "SCRIPTS" ASSET ---
     public void ToggleFeedingTool()
     {
         if (shopUI != null) shopUI.ToggleFeedingTool();
     }
 
+    // --- RESTORED FROM ORIGINAL "SCRIPTS" ASSET ---
     public void ToggleSpongeTool()
     {
         if (shopUI != null) shopUI.ToggleSpongeTool();
     }
 
+    // --- RESTORED FROM ORIGINAL "SCRIPTS" ASSET ---
     public void OpenShopMenu()
     {
         if (shopUI != null) shopUI.OpenShopMenu();
     }
 
+    // --- RESTORED FROM ORIGINAL "SCRIPTS" ASSET ---
     public void CloseShopMenu()
     {
         if (shopUI != null) shopUI.CloseShopMenu();
     }
 
+    // Explicitly commands tool and canvas flushes clean
     public void ResetTankUIState()
     {
         if (shopUI != null) shopUI.ResetUI();
     }
 
+    // --- RESTORED FROM ORIGINAL "SCRIPTS" ASSET ---
     public void TriggerNotificationAlert(string msg)
     {
         if (shopUI != null) shopUI.TriggerNotificationAlert(msg);
     }
 
+    // --- RESTORED FROM ORIGINAL "SCRIPTS" ASSET ---
     public void DeductPlantedCash(int amt)
     {
         if (economy != null) economy.DeductCash(amt);
     }
 
+    // --- RESTORED FROM ORIGINAL "SCRIPTS" ASSET ---
     public Transform GetFoodContainer()
     {
         return hierarchyTracker != null ? hierarchyTracker.foodContainer : null;
     }
 
+    // --- RESTORED FROM ORIGINAL "SCRIPTS" ASSET ---
     public Transform GetBubbleContainer()
     {
         return hierarchyTracker != null ? hierarchyTracker.bubbleContainer : null;
     }
 
+    // --- RESTORED FROM ORIGINAL "SCRIPTS" ASSET ---
     public void SpawnBabyFish(GameObject prefab, Vector3 localPosition)
     {
         Vector3 worldPos = this.transform.position + localPosition;
@@ -258,6 +275,7 @@ public class AquariumManager : MonoBehaviour
         newFish.transform.localScale = new Vector3(babyScale, babyScale, 1f);
     }
 
+    // --- RESTORED FROM ORIGINAL "SCRIPTS" ASSET ---
     public void BuyFishFromShop(GameObject prefab, int cost)
     {
         if (prefab != null && economy.TrySpendMoney(cost))
@@ -272,6 +290,7 @@ public class AquariumManager : MonoBehaviour
         }
     }
 
+    // --- RESTORED FROM ORIGINAL "SCRIPTS" ASSET ---
     public void SelectDecorationFromShop(GameObject prefab, int cost)
     {
         if (prefab != null && economy.totalMoney >= cost) 
@@ -284,6 +303,7 @@ public class AquariumManager : MonoBehaviour
         }
     }
 
+    // --- RESTORED FROM ORIGINAL "SCRIPTS" ASSET ---
     public void SelectItemFromShop(GameObject prefab, int cost)
     {
         if (prefab != null && economy.totalMoney >= cost) 

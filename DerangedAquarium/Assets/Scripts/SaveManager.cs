@@ -135,8 +135,12 @@ public class SaveManager : MonoBehaviour
             }
         }
 
-        // 2. RE-ENGINEERED: Loop through EVERY independent 2D AquariumManager instance present
-        AquariumManager[] allTanks = FindObjectsByType<AquariumManager>(FindObjectsSortMode.None);
+        // ===================================================================
+        // --- FIXED: INACTIVE SPECTRUM SAVE SCAN ---
+        // Forces the serialization script to check dormant, inactive background 
+        // objects so expand-zone tycoon setups save cleanly!
+        // ===================================================================
+        AquariumManager[] allTanks = FindObjectsByType<AquariumManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         foreach (AquariumManager tankManager in allTanks)
         {
             if (tankManager == null) continue;
@@ -237,18 +241,39 @@ public class SaveManager : MonoBehaviour
                 GameObject loadedInstance = Instantiate(rawPrefab, savedItem.position, savedItem.rotation, itemContainer != null ? itemContainer.transform : null);
                 loadedInstance.name = savedItem.prefabResourceName + "_Placed";
                 loadedInstance.AddComponent<PlacedItemData>().originalCost = savedItem.originalCost;
+
+                // Wire up loaded 3D prefab shells to trigger their template scene mapping chains
+                TankInteraction3D loadedTankComp = loadedInstance.GetComponentInChildren<TankInteraction3D>();
+                if (loadedTankComp != null)
+                {
+                    loadedTankComp.enabled = true;
+                    if (loadedTankComp.tankID != "Unassigned_Tank")
+                    {
+                        loadedTankComp.InitializeRuntimeTank(loadedTankComp.tankID);
+                    }
+                }
             }
         }
 
-        // Cache loaded tank manager map registry to optimize code injections
-        AquariumManager[] allTanks = FindObjectsByType<AquariumManager>(FindObjectsSortMode.None);
+        // ===================================================================
+        // --- FIXED: INACTIVE ALL-TANK SCANNING AND SPAWN SHIELDING ---
+        // 1. Scans ALL active and inactive tanks in your memory architecture.
+        // 2. Activates 'skipDefaultSpawn = true' on every single one.
+        // This ensures waking up a tank NEVER drops duplicate default fish!
+        // ===================================================================
+        AquariumManager[] allTanks = FindObjectsByType<AquariumManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         Dictionary<string, AquariumManager> tankMap = new Dictionary<string, AquariumManager>();
+        
         foreach (AquariumManager tank in allTanks)
         {
-            if (tank != null && !tankMap.ContainsKey(tank.tankID)) tankMap.Add(tank.tankID, tank);
+            if (tank != null)
+            {
+                tank.skipDefaultSpawn = true; // Block the starter fish trigger!
+                if (!tankMap.ContainsKey(tank.tankID)) tankMap.Add(tank.tankID, tank);
+            }
         }
 
-        // Clear existing creatures across ALL active tanks
+        // Clear existing creatures across ALL active and inactive tanks
         foreach (AquariumManager tank in allTanks)
         {
             if (tank == null) continue;
@@ -269,9 +294,14 @@ public class SaveManager : MonoBehaviour
         {
             string targetTankID = string.IsNullOrEmpty(saved2DItem.assignedTankID) ? "StarterTank" : saved2DItem.assignedTankID;
             
-            // Locate the unique container parent manager that owns this item block
             if (tankMap.TryGetValue(targetTankID, out AquariumManager targetTankManager))
             {
+                // Wake up the matching container layout object if it was sleeping
+                if (!targetTankManager.gameObject.activeSelf)
+                {
+                    targetTankManager.gameObject.SetActive(true);
+                }
+
                 GameObject raw2DPrefab = Resources.Load<GameObject>($"AquariumPrefabs/{saved2DItem.prefabResourceName}");
                 if (raw2DPrefab != null)
                 {
