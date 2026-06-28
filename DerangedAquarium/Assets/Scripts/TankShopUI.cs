@@ -20,6 +20,23 @@ public class TankShopUI : MonoBehaviour
     public void OpenShopMenu() { isShopOpen = true; }
     public void CloseShopMenu() { isShopOpen = false; }
 
+    // ===================================================================
+    // --- FIXED: SLIDING CONTEXT FLUSH ---
+    // Safely clears active tools without forcing GameObject deactivation.
+    // This allows your RectTransform vectors to smoothly translate panels!
+    // ===================================================================
+    public void ResetUI()
+    {
+        isShopOpen = false;
+        isFeedToolActive = false;
+        isSpongeToolActive = false;
+
+        if (errorNotificationText != null) errorNotificationText.gameObject.SetActive(false);
+
+        UpdateFeedButtonUI();
+        UpdateSpongeButtonUI();
+    }
+
     public void ToggleFeedingTool()
     {
         isFeedToolActive = !isFeedToolActive;

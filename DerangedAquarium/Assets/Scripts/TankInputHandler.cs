@@ -42,11 +42,18 @@ public class TankInputHandler : MonoBehaviour
             if (shopUI.isShopOpen) return;
             if (Input.mousePosition.y < 120) return;
             if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;
-            if (Input.mousePosition.x < 0 || Input.mousePosition.x > 1920 || Input.mousePosition.y < 0 || Input.mousePosition.y > 1080) return;
+
+            // ===================================================================
+            // --- FIXED: DYNAMIC MONITOR SCALE PROTECTION ENGINE ---
+            // Swapped hardcoded '1920' and '1080' bounds for active viewport limits.
+            // Spawns food flawlessly across ultra-wide, 1440p, 4K, or resized test windows!
+            // ===================================================================
+            if (Input.mousePosition.x < 0 || Input.mousePosition.x > Screen.width || Input.mousePosition.y < 0 || Input.mousePosition.y > Screen.height) return;
 
             if (shopUI.isFeedToolActive && !shopUI.isSpongeToolActive)
             {
-                Camera activeCam = (localTankCamera != null && localTankCamera.enabled) ? localTankCamera : Camera.main;
+                // Guarantee coordinate mappings look up the correct orthographic lens
+                Camera activeCam = (localTankCamera != null) ? localTankCamera : Camera.main;
                 if (activeCam == null) return;
 
                 Vector3 mousePos = activeCam.ScreenToWorldPoint(Input.mousePosition);

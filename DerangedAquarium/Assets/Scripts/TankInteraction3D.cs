@@ -7,7 +7,6 @@ public class TankInteraction3D : MonoBehaviour
     public string aquariumSceneName = "AquariumScene";
 
     [Header("Tank Multi-Instance Tracking")]
-    [Tooltip("This will be assigned dynamically by the 3D shop placement system!")]
     public string tankID = "Unassigned_Tank";
 
     [Header("UI Prompt")]
@@ -78,21 +77,13 @@ public class TankInteraction3D : MonoBehaviour
 
     private void LocateMyPaired2DManager()
     {
-        // ===================================================================
-        // --- FIXED: DORMANT ASSET RESOLUTION ---
-        // Includes inactive objects in the type scan so it can locate 
-        // expansions that have put themselves to sleep on scene startup!
-        // ===================================================================
         AquariumManager[] allManagers = FindObjectsByType<AquariumManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         foreach (AquariumManager manager in allManagers)
         {
             if (manager != null && manager.tankID == this.tankID)
             {
                 myPaired2DManager = manager;
-                
-                // Wake up the simulation tree hierarchy now that placement is authorized!
                 myPaired2DManager.gameObject.SetActive(true);
-                
                 Debug.Log($"<color=green>[Link Success]</color> Placed Prefab Shell successfully bound and activated 2D workspace: <b>{tankID}</b>!");
                 break;
             }
@@ -133,6 +124,16 @@ public class TankInteraction3D : MonoBehaviour
         isViewingTank = false;
         if (localPlayer == null) localPlayer = FindFirstObjectByType<PlayerController3D>();
 
+        // ===================================================================
+        // --- THE UI FLUSH FIX ---
+        // Forces the current aquarium to completely reset its selection 
+        // tools and close open windows before turning the screen camera off!
+        // ===================================================================
+        if (myPaired2DManager != null)
+        {
+            myPaired2DManager.ResetTankUIState();
+        }
+
         if (localPlayer != null)
         {
             localPlayer.SetPlayerLockState(false);
@@ -169,6 +170,9 @@ public class TankInteraction3D : MonoBehaviour
                     mgr.isTankVisible = false;
                     if (mgr.tankCamera != null) mgr.tankCamera.enabled = false;
                     if (mgr.mainTankCanvas != null) mgr.mainTankCanvas.enabled = false;
+                    
+                    // Defensive sweep: Ensure any background tank UI is completely flushed clean
+                    mgr.ResetTankUIState();
                 }
             }
         }

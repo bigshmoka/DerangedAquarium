@@ -25,7 +25,26 @@ public class AquariumManager : MonoBehaviour
     public Button spongeToolButton;     
     public TMP_Text spongeToolText;     
 
-    [HideInInspector] public bool isTankVisible = false;
+    // ===================================================================
+    // --- FIXED: AUTOMATED VIEW-STATE FLUSH PROPERTY ---
+    // Intercepts exit sequences. The exact frame you hit 'Q', it forces
+    // the shop closed, triggering the tab to smoothly slide away!
+    // ===================================================================
+    private bool _isTankVisible = false;
+    [HideInInspector] 
+    public bool isTankVisible 
+    {
+        get { return _isTankVisible; }
+        set 
+        { 
+            _isTankVisible = value; 
+            if (!_isTankVisible)
+            {
+                isShopOpen = false; 
+                ResetTankUIState();
+            }
+        }
+    }
 
     [Header("Multi-Tank Core Settings")]
     public string tankID = "StarterTank";
@@ -82,15 +101,29 @@ public class AquariumManager : MonoBehaviour
         placementSystem.Initialize(economy, shopUI);
         inputHandler.Initialize(shopUI, placementSystem, hierarchyTracker);
 
+        // ===================================================================
+        // --- FIXED: CROSS-TANK EXPLICIT REFERENCE INJECTION ---
+        // Automatically locates the ShopClickTab script within this tank's canvas
+        // and injects itself. This cleanly stops sibling components from cross-talking!
+        // ===================================================================
+        if (mainTankCanvas != null)
+        {
+            ShopClickTab localTab = mainTankCanvas.GetComponentInChildren<ShopClickTab>(true);
+            if (localTab != null)
+            {
+                localTab.aquariumManager = this;
+                
+                // Keep the window container awake so it can translate positions cleanly
+                if (shopMenuWindow != null)
+                {
+                    shopMenuWindow.SetActive(true);
+                }
+            }
+        }
+
         if (tankCamera == null) Debug.LogError($"[Tank Fix] You forgot to drag the Camera into the {gameObject.name} manager!");
         if (mainTankCanvas == null) Debug.LogError($"[Tank Fix] You forgot to drag the Canvas into the {gameObject.name} manager!");
 
-        // ===================================================================
-        // --- THE HIBERNATION FIX ---
-        // If this expansion layout instance is additively awoken on bootup, 
-        // force it into complete hibernation. It will wait until the 3D player 
-        // physically finalizes placement before running initialization or ticking!
-        // ===================================================================
         if (tankID != "StarterTank")
         {
             gameObject.SetActive(false);
@@ -113,7 +146,6 @@ public class AquariumManager : MonoBehaviour
 
         if (errorNotificationText != null) errorNotificationText.gameObject.SetActive(false);
 
-        // This spawning block now fires cleanly only when the tank is activated
         if (fishPrefab != null)
         {
             SpawnBabyFish(fishPrefab, new Vector3(-2f, 0f, 0f));
@@ -191,6 +223,11 @@ public class AquariumManager : MonoBehaviour
     public void CloseShopMenu()
     {
         if (shopUI != null) shopUI.CloseShopMenu();
+    }
+
+    public void ResetTankUIState()
+    {
+        if (shopUI != null) shopUI.ResetUI();
     }
 
     public void TriggerNotificationAlert(string msg)

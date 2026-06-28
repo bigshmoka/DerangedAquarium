@@ -14,22 +14,11 @@ public class ShopClickTab : MonoBehaviour
     public Vector2 visiblePosition;
 
     private Vector2 targetPosition;
-    private bool isOpen = false;
 
     void Start()
     {
         if (tabRectTransform == null)
             tabRectTransform = GetComponent<RectTransform>();
-            
-        // FIXED MULTI-TANK HOOK: Look up parent tree context nodes instead of sweeping globally
-        if (aquariumManager == null)
-            aquariumManager = GetComponentInParent<AquariumManager>();
-
-        // Ensure the layout window container stays awake so it can move seamlessly
-        if (aquariumManager != null && aquariumManager.shopMenuWindow != null)
-        {
-            aquariumManager.shopMenuWindow.SetActive(true);
-        }
 
         tabRectTransform.anchoredPosition = hiddenPosition;
         targetPosition = hiddenPosition;
@@ -37,51 +26,55 @@ public class ShopClickTab : MonoBehaviour
         Button btn = GetComponent<Button>();
         if (btn != null)
         {
+            btn.onClick.RemoveAllListeners();
             btn.onClick.AddListener(ToggleShop);
         }
     }
 
     void Update()
     {
-        // Smoothly slide toward target positioning definitions
+        // ===================================================================
+        // --- FIXED: MASTER STATE DIRECTIONAL DRIVE ---
+        // The sliding location is driven directly by the manager's state.
+        // This removes conflicting local booleans that break on view changes!
+        // ===================================================================
+        if (aquariumManager != null)
+        {
+            targetPosition = aquariumManager.isShopOpen ? visiblePosition : hiddenPosition;
+        }
+
         tabRectTransform.anchoredPosition = Vector2.Lerp(
             tabRectTransform.anchoredPosition, 
             targetPosition, 
             Time.deltaTime * slideSpeed
         );
-
-        // Automatically slide away if the manager flags the shop as closed (e.g. after buying a fish)
-        if (aquariumManager != null && !aquariumManager.isShopOpen && isOpen)
-        {
-            ForceClose();
-        }
     }
 
     public void ToggleShop()
     {
-        isOpen = !isOpen;
-
-        if (isOpen)
+        if (aquariumManager != null)
         {
-            targetPosition = visiblePosition;
-            if (aquariumManager != null)
+            // Reverse the master shop tracking state directly
+            aquariumManager.isShopOpen = !aquariumManager.isShopOpen;
+            
+            // Synchronize the internal UI layout tracker flags
+            if (aquariumManager.isShopOpen)
             {
-                aquariumManager.isShopOpen = true;
+                aquariumManager.OpenShopMenu();
             }
-        }
-        else
-        {
-            ForceClose();
+            else
+            {
+                aquariumManager.CloseShopMenu();
+            }
         }
     }
 
     public void ForceClose()
     {
-        isOpen = false;
-        targetPosition = hiddenPosition;
         if (aquariumManager != null)
         {
             aquariumManager.isShopOpen = false;
+            aquariumManager.CloseShopMenu();
         }
     }
 }
