@@ -10,12 +10,12 @@ public class ChestBubble : MonoBehaviour
     {
         Destroy(gameObject, lifetime);
 
-        // --- NEW: CHECK STATE AT BIRTH WORKFLOW ---
-        AquariumManager manager = FindFirstObjectByType<AquariumManager>();
+        // FIXED MULTI-TANK HOOK: Look up parent tree branches for culling visibility logic
+        AquariumManager manager = GetComponentInParent<AquariumManager>();
         if (manager != null && !manager.isTankVisible)
         {
             SpriteRenderer sr = GetComponent<SpriteRenderer>();
-            if (sr != null) sr.enabled = false; // Spawns invisibly in the background
+            if (sr != null) sr.enabled = false; // Spawns invisibly in the background safely
         }
     }
 

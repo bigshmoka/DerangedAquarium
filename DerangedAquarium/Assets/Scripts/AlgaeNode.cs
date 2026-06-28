@@ -24,51 +24,43 @@ public class AlgaeNode : MonoBehaviour
         {
             currentAlgaeLevel += (baseGrowthRate * customGrowthMultiplier) * Time.deltaTime;
             if (currentAlgaeLevel > 1f) currentAlgaeLevel = 1f;
-
             UpdateVisuals();
         }
     }
 
-    // This handles the automated cleaning from the Snail
     public void CleanAlgae(float amount)
     {
         currentAlgaeLevel -= amount;
         if (currentAlgaeLevel < 0f) currentAlgaeLevel = 0f;
-
         UpdateVisuals();
     }
 
-    // --- NO-CLICK HOVER WIPING ---
-    // This triggers the EXACT instant the mouse cursor crosses into the wall's collider box
     void OnMouseEnter()
     {
-        AquariumManager manager = FindFirstObjectByType<AquariumManager>();
+        AquariumManager manager = GetComponentInParent<AquariumManager>();
         
-        // Check if the manager exists and the Sponge tool is currently toggled ON
-        if (manager != null && manager.IsSpongeToolActive())
+        if (manager == null)
         {
-            // --- FIXED: DELTA-TIME GROWTH THRESHOLD GATE ---
-            // Because Update() grows algae slightly every frame, checking strictly for '> 0f' 
-            // fails when scrubbing. We use 0.05f (5% dirty) as our "functionally clean" cutoff!
+            Debug.LogError($"[Algae Error] {gameObject.name} in {gameObject.scene.name} cannot find its AquariumManager!");
+            return;
+        }
+
+        if (manager.IsSpongeToolActive())
+        {
             if (currentAlgaeLevel > 0.05f)
             {
-                // Instantly wipe away 30% of the algae just by sliding the mouse over it!
                 currentAlgaeLevel -= 0.30f;
                 if (currentAlgaeLevel < 0f) currentAlgaeLevel = 0f;
-
                 UpdateVisuals();
-                Debug.Log(gameObject.name + " scrubbed via hover! Current Algae: " + currentAlgaeLevel);
+                
+                // RESTORED: Debug Log for Scrubbing
+                Debug.Log($"<color=cyan>[Algae Clean]</color> Scrubbed 30% from {gameObject.name} in <b>{manager.tankID}</b>. New Level: {currentAlgaeLevel:F2}");
 
-                // Increments your quest tracking safely without exploitation loops
-                if (QuestManager.Instance != null)
-                {
-                    QuestManager.Instance.ProgressQuest("clean_algae", 1);
-                }
+                if (QuestManager.Instance != null) QuestManager.Instance.ProgressQuest("clean_algae", 1);
             }
         }
     }
 
-    // --- FIXED: EXPOSED AS PUBLIC TO ALLOW DYNAMIC REBINDING RECONSTRUCTIONS ---
     public void UpdateVisuals()
     {
         if (spriteRenderer != null)
@@ -79,7 +71,6 @@ public class AlgaeNode : MonoBehaviour
         }
     }
 
-    // --- NEW: REGISTRY INITIALIZATION INJECTION ENTRY ---
     public void InitializeAlgaeLevel(float level)
     {
         currentAlgaeLevel = level;

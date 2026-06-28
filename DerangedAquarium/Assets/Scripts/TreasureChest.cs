@@ -52,8 +52,8 @@ public class TreasureChest : MonoBehaviour
         transform.localScale = originalScale * 0.9f; // Slight squish before the pop
         targetScale = originalScale * popScaleMultiplier; // Big expansion
 
-        // --- FETCH THE CORRECT BUBBLE CONTAINER TRANSFORM ---
-        AquariumManager manager = FindFirstObjectByType<AquariumManager>();
+        // FIXED MULTI-TANK HOOK: Fetches the local parent manager folder container instead of global first match
+        AquariumManager manager = GetComponentInParent<AquariumManager>();
         Transform container = (manager != null) ? manager.GetBubbleContainer() : null;
 
         // Spawn a small cluster of bubbles with slight horizontal offsets

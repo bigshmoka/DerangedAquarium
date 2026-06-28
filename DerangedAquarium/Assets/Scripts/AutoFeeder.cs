@@ -14,15 +14,15 @@ public class AutoFeeder : MonoBehaviour
 
     void Start()
     {
-        // Dynamically locate the food prefab from your main Aquarium Manager
-        AquariumManager manager = FindFirstObjectByType<AquariumManager>();
+        // FIXED MULTI-TANK HOOK: Look in parent hierarchy context instead of global scene search
+        AquariumManager manager = GetComponentInParent<AquariumManager>();
         if (manager != null)
         {
             foodPrefab = manager.foodPrefab;
         }
         else
         {
-            Debug.LogError("[AutoFeeder] AquariumManager could not be found in the scene!");
+            Debug.LogError("[AutoFeeder] AquariumManager could not be found in parent hierarchy branch structures!");
         }
 
         // Initialize the timer randomly so if players buy multiple feeders, 
@@ -47,9 +47,8 @@ public class AutoFeeder : MonoBehaviour
         // Calculate the drop position slightly below the feeder's center sprite anchor
         Vector3 dropPosition = new Vector3(transform.position.x, transform.position.y + dropYOffset, transform.position.z);
         
-        // --- THE FIXED HIERARCHY ATTACHMENT ---
-        // Fetch the router manager and retrieve the designated container folder for food items
-        AquariumManager manager = FindFirstObjectByType<AquariumManager>();
+        // FIXED MULTI-TANK HOOK: Route food spawning through the local parent manager folder tree branch
+        AquariumManager manager = GetComponentInParent<AquariumManager>();
         Transform container = (manager != null) ? manager.GetFoodContainer() : null;
 
         // Drop the food pellet into the aquarium nested safely under the container folder

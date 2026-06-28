@@ -9,16 +9,9 @@ public class MoneyDropItem : MonoBehaviour
     [HideInInspector] 
     public bool hasBeenMultiplied = false;
 
-    // --- NEW: CHECK STATE AT BIRTH WORKFLOW ---
-    void Start()
-    {
-        AquariumManager manager = FindFirstObjectByType<AquariumManager>();
-        if (manager != null && !manager.isTankVisible)
-        {
-            SpriteRenderer sr = GetComponent<SpriteRenderer>();
-            if (sr != null) sr.enabled = false; // Spawns invisibly in the background
-        }
-    }
+    // REMOVED: The independent Start() visibility check.
+    // The AquariumManager's Toggle2DAquariumVisibility loop will now 
+    // control this renderer automatically, preventing the invisible-on-spawn glitch.
 
     void Update()
     {
@@ -30,7 +23,7 @@ public class MoneyDropItem : MonoBehaviour
 
     void OnMouseEnter()
     {
-        AquariumManager manager = FindFirstObjectByType<AquariumManager>();
+        AquariumManager manager = GetComponentInParent<AquariumManager>();
         if (manager != null)
         {
             manager.totalMoney += cashValue;

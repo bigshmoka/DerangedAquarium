@@ -13,7 +13,10 @@ public class GameSaveData
     public int walletBalance = 100;
     public List<PlacedItemDataWrapper> placed3DItems = new List<PlacedItemDataWrapper>();
     public List<AquariumItemDataWrapper> placed2DItems = new List<AquariumItemDataWrapper>();
-    public List<float> algaeNodeLevels = new List<float>();
+    
+    // --- STRUCTURAL CHANGE: ALGAE LEVELS ARE NOW LINKED TO UNIQUE TANK IDENTIFIERS ---
+    public List<TankAlgaeSaveData> tankAlgaeRecords = new List<TankAlgaeSaveData>();
+    
     public int questChainIndex = 0;
     public int questCurrentCount = 0;
 }
@@ -39,6 +42,16 @@ public class AquariumItemDataWrapper
     public float fishHunger = 0f;
     public bool fishIsFull = false;
     public float fishFullnessTimer = 0f;
+    
+    // --- NEW MULTI-TANK TRACKING FIELD ---
+    public string assignedTankID = "StarterTank";
+}
+
+[System.Serializable]
+public class TankAlgaeSaveData
+{
+    public string tankID;
+    public List<float> nodeLevels = new List<float>();
 }
 
 // ===================================================================
@@ -50,15 +63,12 @@ public class SaveManager : MonoBehaviour
 
     private string saveFilePath;
 
-    // --- CACHED REFLECTION FIELDS ---
-    // Storing these lookups in memory at startup completely eliminates runtime save stutters
     private FieldInfo fishHungerField;
     private FieldInfo fishIsFullField;
     private FieldInfo fishFullnessTimerField;
     private FieldInfo questChainIndexField;
     private MethodInfo questLoadMethod;
 
-    // --- CACHED HIERARCHY REFERENCES ---
     private GameObject cached3DItemContainer;
 
     void Awake()
@@ -80,17 +90,12 @@ public class SaveManager : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.F9)) LoadGame();
     }
 
-    /// <summary>
-    /// Runs exactly once on boot. Converts heavy text-based engine searches into fast memory pointers.
-    /// </summary>
     private void InitializeReflectionCache()
     {
-        // Cache NaturalFishAI private fields
         fishHungerField = typeof(NaturalFishAI).GetField("currentHunger", BindingFlags.Instance | BindingFlags.NonPublic);
         fishIsFullField = typeof(NaturalFishAI).GetField("isFull", BindingFlags.Instance | BindingFlags.NonPublic);
         fishFullnessTimerField = typeof(NaturalFishAI).GetField("fullnessTimer", BindingFlags.Instance | BindingFlags.NonPublic);
 
-        // Cache QuestManager private fields and methods
         questChainIndexField = typeof(QuestManager).GetField("currentChainIndex", BindingFlags.Instance | BindingFlags.NonPublic);
         questLoadMethod = typeof(QuestManager).GetMethod("LoadCurrentQuestFromChain", BindingFlags.Instance | BindingFlags.NonPublic);
     }
@@ -110,7 +115,7 @@ public class SaveManager : MonoBehaviour
 
         GameSaveData dataToSave = new GameSaveData { walletBalance = GlobalEconomyManager.Instance.GetBalance() };
 
-        // 3D Item Serialization
+        // 1. Serialize 3D placed shop furniture elements
         GameObject itemContainer = Get3DItemContainer();
         if (itemContainer != null)
         {
@@ -130,16 +135,19 @@ public class SaveManager : MonoBehaviour
             }
         }
 
-        // 2D Aquarium Serialization
-        AquariumManager tankManager = FindFirstObjectByType<AquariumManager>();
-        if (tankManager != null)
+        // 2. RE-ENGINEERED: Loop through EVERY independent 2D AquariumManager instance present
+        AquariumManager[] allTanks = FindObjectsByType<AquariumManager>(FindObjectsSortMode.None);
+        foreach (AquariumManager tankManager in allTanks)
         {
+            if (tankManager == null) continue;
+
+            string currentTankID = tankManager.tankID;
+
+            // Serialize creatures and local upgrades inside this explicit container
             foreach (Transform child in tankManager.transform)
             {
                 bool isFish = child.GetComponent<NaturalFishAI>() != null || child.name.Contains("Fish");
                 bool isSnail = child.GetComponent<SnailAI>() != null || child.name.Contains("Snail");
-                
-                // FIXED: Reverted back to string lookup check since TankDecoration doesn't exist as a C# class symbol
                 bool isDecor = child.name.Contains("_Placed") || child.GetComponent("TankDecoration") != null;
                 bool isUtilityItem = child.name.Contains("Feeder") || child.name.Contains("Item") || child.name.Contains("Machine");
 
@@ -149,7 +157,8 @@ public class SaveManager : MonoBehaviour
                     {
                         prefabResourceName = child.name.Replace("(Clone)", "").Replace("_Placed", "").Trim(),
                         position = child.position,
-                        localScale = child.localScale
+                        localScale = child.localScale,
+                        assignedTankID = currentTankID // Stamp item with its matching home tank ID!
                     };
 
                     NaturalFishAI fishAI = child.GetComponent<NaturalFishAI>();
@@ -159,7 +168,6 @@ public class SaveManager : MonoBehaviour
                         aqWrapper.fishBaseScale = fishAI.baseScale;
                         aqWrapper.fishFacingSign = fishAI.facingDirectionSign;
 
-                        // Using pre-cached fields directly avoids heavy CPU loops
                         if (fishHungerField != null) aqWrapper.fishHunger = (float)fishHungerField.GetValue(fishAI);
                         if (fishIsFullField != null) aqWrapper.fishIsFull = (bool)fishIsFullField.GetValue(fishAI);
                         if (fishFullnessTimerField != null) aqWrapper.fishFullnessTimer = (float)fishFullnessTimerField.GetValue(fishAI);
@@ -171,19 +179,23 @@ public class SaveManager : MonoBehaviour
                     dataToSave.placed2DItems.Add(aqWrapper);
                 }
             }
-        }
 
-        // Algae Serialization
-        AlgaeManager algaeManager = FindFirstObjectByType<AlgaeManager>();
-        if (algaeManager != null && algaeManager.algaeNodes != null)
-        {
-            foreach (AlgaeNode node in algaeManager.algaeNodes)
+            // Serialize Algae levels for this specific tank container structure
+            AlgaeManager algaeManager = tankManager.algaeManager;
+            if (algaeManager == null) algaeManager = tankManager.GetComponentInChildren<AlgaeManager>();
+
+            if (algaeManager != null && algaeManager.algaeNodes != null)
             {
-                dataToSave.algaeNodeLevels.Add(node != null ? node.currentAlgaeLevel : 0f);
+                TankAlgaeSaveData algaeRecord = new TankAlgaeSaveData { tankID = currentTankID };
+                foreach (AlgaeNode node in algaeManager.algaeNodes)
+                {
+                    algaeRecord.nodeLevels.Add(node != null ? node.currentAlgaeLevel : 0f);
+                }
+                dataToSave.tankAlgaeRecords.Add(algaeRecord);
             }
         }
 
-        // Quest Serialization
+        // 3. Serialize Quest State
         if (QuestManager.Instance != null)
         {
             if (questChainIndexField != null) dataToSave.questChainIndex = (int)questChainIndexField.GetValue(QuestManager.Instance);
@@ -194,7 +206,7 @@ public class SaveManager : MonoBehaviour
         }
 
         File.WriteAllText(saveFilePath, JsonUtility.ToJson(dataToSave, true));
-        Debug.Log($"<color=green>[Save System]</color> Optimized Save Completed.");
+        Debug.Log($"<color=green>[Save System]</color> Multi-Tank Structural Groundwork Saved Successfully.");
     }
 
     public void LoadGame()
@@ -204,20 +216,19 @@ public class SaveManager : MonoBehaviour
 
         GameSaveData loadedData = JsonUtility.FromJson<GameSaveData>(File.ReadAllText(saveFilePath));
 
-        // Wallet Balance Synchronization
+        // Sync Wallet
         int currentWalletBalance = GlobalEconomyManager.Instance.GetBalance();
         int balanceDiff = loadedData.walletBalance - currentWalletBalance;
         if (balanceDiff > 0) GlobalEconomyManager.Instance.AddMoney(balanceDiff);
         else if (balanceDiff < 0) GlobalEconomyManager.Instance.DeductMoney(Mathf.Abs(balanceDiff));
 
-        // Clear 3D Room
+        // Rebuild 3D Room Items
         GameObject itemContainer = Get3DItemContainer();
         if (itemContainer != null)
         {
             for (int i = itemContainer.transform.childCount - 1; i >= 0; i--) Destroy(itemContainer.transform.GetChild(i).gameObject);
         }
 
-        // Spawn 3D Room
         foreach (PlacedItemDataWrapper savedItem in loadedData.placed3DItems)
         {
             GameObject rawPrefab = Resources.Load<GameObject>($"StorefrontPrefabs/{savedItem.prefabResourceName}");
@@ -229,13 +240,20 @@ public class SaveManager : MonoBehaviour
             }
         }
 
-        // Clear & Re-populate 2D Aquarium
-        AquariumManager tankManager = FindFirstObjectByType<AquariumManager>();
-        if (tankManager != null)
+        // Cache loaded tank manager map registry to optimize code injections
+        AquariumManager[] allTanks = FindObjectsByType<AquariumManager>(FindObjectsSortMode.None);
+        Dictionary<string, AquariumManager> tankMap = new Dictionary<string, AquariumManager>();
+        foreach (AquariumManager tank in allTanks)
         {
-            foreach (Transform child in tankManager.transform)
+            if (tank != null && !tankMap.ContainsKey(tank.tankID)) tankMap.Add(tank.tankID, tank);
+        }
+
+        // Clear existing creatures across ALL active tanks
+        foreach (AquariumManager tank in allTanks)
+        {
+            if (tank == null) continue;
+            foreach (Transform child in tank.transform)
             {
-                // FIXED: Reverted back to safe string component lookup check for TankDecoration
                 if (child.GetComponent<NaturalFishAI>() != null || child.name.Contains("Fish") ||
                     child.GetComponent<SnailAI>() != null || child.name.Contains("Snail") ||
                     child.name.Contains("_Placed") || child.GetComponent("TankDecoration") != null ||
@@ -244,13 +262,20 @@ public class SaveManager : MonoBehaviour
                     Destroy(child.gameObject);
                 }
             }
+        }
 
-            foreach (AquariumItemDataWrapper saved2DItem in loadedData.placed2DItems)
+        // Re-populate 2D Items back into their specific target home tank modules!
+        foreach (AquariumItemDataWrapper saved2DItem in loadedData.placed2DItems)
+        {
+            string targetTankID = string.IsNullOrEmpty(saved2DItem.assignedTankID) ? "StarterTank" : saved2DItem.assignedTankID;
+            
+            // Locate the unique container parent manager that owns this item block
+            if (tankMap.TryGetValue(targetTankID, out AquariumManager targetTankManager))
             {
                 GameObject raw2DPrefab = Resources.Load<GameObject>($"AquariumPrefabs/{saved2DItem.prefabResourceName}");
                 if (raw2DPrefab != null)
                 {
-                    GameObject loaded2DInstance = Instantiate(raw2DPrefab, saved2DItem.position, Quaternion.identity, tankManager.transform);
+                    GameObject loaded2DInstance = Instantiate(raw2DPrefab, saved2DItem.position, Quaternion.identity, targetTankManager.transform);
                     loaded2DInstance.name = saved2DItem.prefabResourceName;
 
                     NaturalFishAI fishAI = loaded2DInstance.GetComponent<NaturalFishAI>();
@@ -263,7 +288,6 @@ public class SaveManager : MonoBehaviour
                         fishAI.facingDirectionSign = saved2DItem.fishFacingSign != 0f ? saved2DItem.fishFacingSign : 1f;
                         loaded2DInstance.transform.localScale = saved2DItem.localScale;
 
-                        // Optimized Pointers
                         if (fishHungerField != null) fishHungerField.SetValue(fishAI, saved2DItem.fishHunger);
                         if (fishIsFullField != null) fishIsFullField.SetValue(fishAI, saved2DItem.fishIsFull);
                         if (fishFullnessTimerField != null) fishFullnessTimerField.SetValue(fishAI, saved2DItem.fishFullnessTimer);
@@ -278,7 +302,8 @@ public class SaveManager : MonoBehaviour
                         StartCoroutine(ApplyDelayedScale(loaded2DInstance, saved2DItem.localScale));
                     }
 
-                    if (!tankManager.isTankVisible)
+                    // Dynamic Visibility Isolation Mask
+                    if (!targetTankManager.isTankVisible)
                     {
                         foreach (Renderer rend in loaded2DInstance.GetComponentsInChildren<Renderer>()) rend.enabled = false;
                     }
@@ -286,60 +311,57 @@ public class SaveManager : MonoBehaviour
             }
         }
 
-        // Restore Algae Cleanness
-        AlgaeManager algaeManager = FindFirstObjectByType<AlgaeManager>();
-        if (algaeManager != null && algaeManager.algaeNodes != null && loadedData.algaeNodeLevels != null)
+        // Restore Algae records across matching target modules
+        if (loadedData.tankAlgaeRecords != null)
         {
-            int nodeCount = Mathf.Min(algaeManager.algaeNodes.Length, loadedData.algaeNodeLevels.Count);
-            for (int i = 0; i < nodeCount; i++)
+            foreach (TankAlgaeSaveData record in loadedData.tankAlgaeRecords)
             {
-                if (algaeManager.algaeNodes[i] != null) algaeManager.algaeNodes[i].InitializeAlgaeLevel(loadedData.algaeNodeLevels[i]);
+                if (tankMap.TryGetValue(record.tankID, out AquariumManager targetTank))
+                {
+                    AlgaeManager algaeManager = targetTank.algaeManager ?? targetTank.GetComponentInChildren<AlgaeManager>();
+                    if (algaeManager != null && algaeManager.algaeNodes != null)
+                    {
+                        int nodeCount = Mathf.Min(algaeManager.algaeNodes.Length, record.nodeLevels.Count);
+                        for (int i = 0; i < nodeCount; i++)
+                        {
+                            if (algaeManager.algaeNodes[i] != null) algaeManager.algaeNodes[i].InitializeAlgaeLevel(record.nodeLevels[i]);
+                        }
+                    }
+                }
             }
         }
 
-        // --- RESTORE QUEST STATE WITH AUTO-ROLLOVER INTERCEPT PROTECTION ---
+        // Restore Quests with Rollover protection intact
         if (QuestManager.Instance != null)
         {
             int workingChainIndex = loadedData.questChainIndex;
             int workingCount = loadedData.questCurrentCount;
 
-            // 1. Initially set the index back down to the saved setting
             if (questChainIndexField != null) questChainIndexField.SetValue(QuestManager.Instance, workingChainIndex);
-            
-            // 2. Load the base configurations of that specific quest into activeQuests arrays
             if (questLoadMethod != null) questLoadMethod.Invoke(QuestManager.Instance, null);
 
-            // 3. Evaluate if we are trapped inside the boundary limbo glitch window!
             if (QuestManager.Instance.activeQuests != null && QuestManager.Instance.activeQuests.Count > 0)
             {
                 Quest loadedQuest = QuestManager.Instance.activeQuests[0];
-
                 if (workingCount >= loadedQuest.targetCount)
                 {
-                    // INTERCEPTED: The save happened during the objective completion frame!
-                    // Forcefully push the index to the next level configuration automatically.
                     workingChainIndex++;
-                    
                     if (questChainIndexField != null) questChainIndexField.SetValue(QuestManager.Instance, workingChainIndex);
                     if (questLoadMethod != null) questLoadMethod.Invoke(QuestManager.Instance, null);
 
-                    // Reset sub-task values to 0 for the fresh next assignment
                     if (QuestManager.Instance.activeQuests != null && QuestManager.Instance.activeQuests.Count > 0)
                     {
                         QuestManager.Instance.activeQuests[0].currentCount = 0;
                     }
-                    
-                    Debug.Log("<color=yellow>[Save Intercept]</color> Completed objective layout detected upon loading! Pushed chapter index forward smoothly.");
                 }
                 else
                 {
-                    // Normal state parameters: Apply the objective sub-count as it was
                     loadedQuest.currentCount = workingCount;
                 }
             }
         }
 
-        Debug.Log("<color=cyan>[Save System]</color> Optimized Load Completed Successfully.");
+        Debug.Log("<color=cyan>[Save System]</color> Multi-Tank Safe Load Sequence Finalized Successfully.");
     }
 
     private IEnumerator ApplyDelayedScale(GameObject target, Vector3 savedScale)

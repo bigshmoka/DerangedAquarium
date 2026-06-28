@@ -19,13 +19,22 @@ public class LivePlant : MonoBehaviour
 
     private SpriteRenderer spriteRenderer;
     private AlgaeManager algaeManager;
-    
     private bool lastFrameHealthy = true;
 
     void Start()
     {
         spriteRenderer = GetComponent<SpriteRenderer>();
-        algaeManager = FindFirstObjectByType<AlgaeManager>();
+        
+        // ===================================================================
+        // --- FIXED: LOCAL PARENT-BRANCH DISCOVERY ---
+        // This ensures the plant only talks to the AlgaeManager that is physically
+        // inside its own Tank's folder/hierarchy.
+        // ===================================================================
+        AquariumManager manager = GetComponentInParent<AquariumManager>();
+        if (manager != null)
+        {
+            algaeManager = manager.algaeManager;
+        }
         
         if (spriteRenderer != null) spriteRenderer.color = healthyColor;
     }
@@ -36,7 +45,6 @@ public class LivePlant : MonoBehaviour
 
         bool foundAlgaeChoke = false;
         
-        // OPTIMIZED SCAN ENGINE ROUTINE: Loops directly over your manager's array cache nodes
         if (algaeManager.algaeNodes != null)
         {
             foreach (AlgaeNode node in algaeManager.algaeNodes)
@@ -47,14 +55,13 @@ public class LivePlant : MonoBehaviour
                 if (distance <= searchRadius && node.currentAlgaeLevel > algaeChokeThreshold)
                 {
                     foundAlgaeChoke = true;
-                    break; // Break out immediately upon first positive detection
+                    break;
                 }
             }
         }
 
         isHealthy = !foundAlgaeChoke;
 
-        // ANTI-SPAM CONDITIONAL DEBUG LOGS
         if (isHealthy != lastFrameHealthy)
         {
             if (!isHealthy)
@@ -65,7 +72,6 @@ public class LivePlant : MonoBehaviour
             {
                 Debug.Log($"<color=green>[Ecosystem] {gameObject.name} is now CLEAN and healthy!</color> (Hunger buff restored)");
             }
-            
             lastFrameHealthy = isHealthy; 
         }
 

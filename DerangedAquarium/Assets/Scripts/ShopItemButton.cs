@@ -18,8 +18,8 @@ public class ShopItemButton : MonoBehaviour
             return;
         }
 
-        // Locates the master manager in the current scene
-        AquariumManager manager = FindFirstObjectByType<AquariumManager>();
+        // FIXED MULTI-TANK HOOK: Traces parent context hierarchies to route UI commands to the local manager branch
+        AquariumManager manager = GetComponentInParent<AquariumManager>();
         
         if (manager != null)
         {
@@ -29,8 +29,8 @@ public class ShopItemButton : MonoBehaviour
                 // Unique Snail population limiter
                 if (itemData.itemPrefab != null && itemData.itemPrefab.name.Contains("Snail"))
                 {
-                    // Scan the tank to see if a snail already exists
-                    SnailAI existingSnail = FindFirstObjectByType<SnailAI>();
+                    // Scan the local tank to see if a snail already exists in this specific structure branch
+                    SnailAI existingSnail = manager.GetComponentInChildren<SnailAI>();
                     
                     if (existingSnail != null)
                     {

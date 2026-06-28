@@ -4,8 +4,10 @@ using UnityEngine.SceneManagement;
 public class TankInteraction3D : MonoBehaviour
 {
     [Header("Scene Configuration")]
-    [Tooltip("The EXACT string name of your existing 2D Aquarium scene file.")]
     public string aquariumSceneName = "AquariumScene";
+
+    [Header("Tank Multi-Instance Tracking")]
+    public string tankID = "StarterTank";
 
     [Header("UI Prompt")]
     public GameObject pressEPromptUI;
@@ -13,61 +15,85 @@ public class TankInteraction3D : MonoBehaviour
     private bool isPlayerNearby = false;
     private bool isViewingTank = false;
     private PlayerController3D localPlayer;
+    
+    private AquariumManager myPaired2DManager;
+    private static bool isSceneLoading = false;
 
     void Start()
     {
         if (pressEPromptUI != null) pressEPromptUI.SetActive(false);
 
-        // Pre-load the aquarium scene in the background on frame 1
         Scene aquariumScene = SceneManager.GetSceneByName(aquariumSceneName);
-        if (!aquariumScene.isLoaded)
+        
+        if (!aquariumScene.isLoaded && !isSceneLoading)
         {
+            isSceneLoading = true;
             SceneManager.LoadScene(aquariumSceneName, LoadSceneMode.Additive);
             StartCoroutine(InitializeTankVisibilityOnStart());
+        }
+        else
+        {
+            StartCoroutine(WaitForSceneAndLink());
         }
     }
 
     private System.Collections.IEnumerator InitializeTankVisibilityOnStart()
     {
-        // Wait exactly one frame to let the additive scene objects awake safely
-        yield return null;
+        Scene aquariumScene = SceneManager.GetSceneByName(aquariumSceneName);
+        while (!aquariumScene.isLoaded) yield return null;
+        yield return new WaitForEndOfFrame();
+
+        // ONLY disable Cameras and Canvases on boot. Let the art meshes stay on since they are spaced far apart!
+        foreach (GameObject rootObj in aquariumScene.GetRootGameObjects())
+        {
+            foreach (Canvas c in rootObj.GetComponentsInChildren<Canvas>(true)) c.enabled = false;
+            foreach (Camera cam in rootObj.GetComponentsInChildren<Camera>(true)) cam.enabled = false;
+        }
+
+        isSceneLoading = false;
+        LocateMyPaired2DManager();
         Toggle2DAquariumVisibility(false);
+    }
+
+    private System.Collections.IEnumerator WaitForSceneAndLink()
+    {
+        Scene aquariumScene = SceneManager.GetSceneByName(aquariumSceneName);
+        while (!aquariumScene.isLoaded || isSceneLoading) yield return null;
+        LocateMyPaired2DManager();
+        Toggle2DAquariumVisibility(false);
+    }
+
+    private void LocateMyPaired2DManager()
+    {
+        AquariumManager[] allManagers = FindObjectsByType<AquariumManager>(FindObjectsSortMode.None);
+        foreach (AquariumManager manager in allManagers)
+        {
+            if (manager != null && manager.tankID == this.tankID)
+            {
+                myPaired2DManager = manager;
+                break;
+            }
+        }
     }
 
     void Update()
     {
-        // Case 1: Player is near the tank and hits 'E' to open the view
-        if (isPlayerNearby && !isViewingTank && Input.GetKeyDown(KeyCode.E))
-        {
-            EnterAquariumView();
-        }
-        // Case 2: Player wants to step away into the 3D shop using 'Q'
-        else if (isViewingTank && Input.GetKeyDown(KeyCode.Q))
-        {
-            ExitAquariumView();
-        }
+        if (isPlayerNearby && !isViewingTank && Input.GetKeyDown(KeyCode.E)) EnterAquariumView();
+        else if (isViewingTank && Input.GetKeyDown(KeyCode.Q)) ExitAquariumView();
     }
 
     void EnterAquariumView()
     {
         isViewingTank = true;
         if (pressEPromptUI != null) pressEPromptUI.SetActive(false);
-
         if (localPlayer != null) localPlayer.SetPlayerLockState(true);
         if (Camera.main != null) Camera.main.gameObject.SetActive(false);
 
-        // Turn on all 2D aquarium assets
         Toggle2DAquariumVisibility(true);
 
-        // --- NEW: HIDE THE 3D STOREFRONT HUD MONEY TEXT ---
-        // Dynamically locate the 3D HUD component and safely disable its money display text mesh box
         HUD3DController hud3D = FindFirstObjectByType<HUD3DController>();
-        if (hud3D != null)
-        {
-            hud3D.SetMoneyTextVisibility(false);
-        }
+        if (hud3D != null) hud3D.SetMoneyTextVisibility(false);
 
-        // UNLOCK MOUSE FOR TANK MENU NAVIGATING
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
     }
@@ -75,80 +101,63 @@ public class TankInteraction3D : MonoBehaviour
     void ExitAquariumView()
     {
         isViewingTank = false;
+        if (localPlayer == null) localPlayer = FindFirstObjectByType<PlayerController3D>();
 
-        if (localPlayer != null) localPlayer.SetPlayerLockState(false);
-
-        // Hide the 2D art assets from the 3D camera view
-        Toggle2DAquariumVisibility(false);
-
-        // --- NEW: RESTORE THE 3D STOREFRONT HUD MONEY TEXT ---
-        // Turn the 3D shop's money text layout back on seamlessly as you stand up
-        HUD3DController hud3D = FindFirstObjectByType<HUD3DController>();
-        if (hud3D != null)
+        if (localPlayer != null)
         {
-            hud3D.SetMoneyTextVisibility(true);
+            localPlayer.SetPlayerLockState(false);
+            if (localPlayer.playerCamera != null)
+            {
+                Camera playerCam = localPlayer.playerCamera.GetComponent<Camera>();
+                if (playerCam != null) playerCam.gameObject.SetActive(true);
+            }
         }
 
-        Camera playerCam = localPlayer.playerCamera.GetComponent<Camera>();
-        if (playerCam != null) playerCam.gameObject.SetActive(true);
+        Toggle2DAquariumVisibility(false);
 
-        if (isPlayerNearby && pressEPromptUI != null) pressEPromptUI.SetActive(true);
+        HUD3DController hud3D = FindFirstObjectByType<HUD3DController>();
+        if (hud3D != null) hud3D.SetMoneyTextVisibility(true);
 
-        // INSTANT FIRST-PERSON LOOK CAPTURE
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
     }
 
-    // This method hides the VISUALS but leaves the simulation logic running perfectly
+    // =========================================================
+    // --- THE FIX: THE GLOBAL SLEDGEHAMMER ---
+    // =========================================================
     void Toggle2DAquariumVisibility(bool makeVisible)
     {
-        Scene aquariumScene = SceneManager.GetSceneByName(aquariumSceneName);
-        if (!aquariumScene.isLoaded) return;
+        if (myPaired2DManager == null) LocateMyPaired2DManager();
+        if (myPaired2DManager == null) return;
 
-        // Let the AquariumManager know if the tank is currently being viewed or background hidden
-        AquariumManager manager = FindFirstObjectByType<AquariumManager>();
-        if (manager != null)
+        // 1. If we are turning ON a tank, aggressively turn OFF every other tank in the entire game first.
+        if (makeVisible)
         {
-            manager.isTankVisible = makeVisible;
+            AquariumManager[] allManagers = FindObjectsByType<AquariumManager>(FindObjectsSortMode.None);
+            foreach (AquariumManager mgr in allManagers)
+            {
+                mgr.isTankVisible = false;
+                if (mgr.tankCamera != null) mgr.tankCamera.enabled = false;
+                if (mgr.mainTankCanvas != null) mgr.mainTankCanvas.enabled = false;
+            }
         }
 
-        GameObject[] rootObjects = aquariumScene.GetRootGameObjects();
-        foreach (GameObject obj in rootObjects)
-        {
-            // 1. Turn off/on all SpriteRenderers and MeshRenderers 
-            Renderer[] renderers = obj.GetComponentsInChildren<Renderer>(true);
-            foreach (Renderer r in renderers)
-            {
-                r.enabled = makeVisible;
-            }
+        // 2. Now definitively turn ON (or OFF) this specific tank's Explicit Links
+        myPaired2DManager.isTankVisible = makeVisible;
 
-            // 2. Turn off/on the User Interface Canvases
-            Canvas[] canvases = obj.GetComponentsInChildren<Canvas>(true);
-            foreach (Canvas c in canvases)
-            {
-                c.enabled = makeVisible;
-            }
+        if (myPaired2DManager.tankCamera != null) 
+            myPaired2DManager.tankCamera.enabled = makeVisible;
 
-            // 3. Turn off/on the 2D Camera component itself
-            Camera cam = obj.GetComponent<Camera>();
-            if (cam != null)
-            {
-                cam.enabled = makeVisible;
-            }
-        }
+        if (myPaired2DManager.mainTankCanvas != null) 
+            myPaired2DManager.mainTankCanvas.enabled = makeVisible;
     }
 
-    // --- 3D TRIGGER DETECTIONS ---
     void OnTriggerEnter(Collider other)
     {
-        Debug.Log($"[Tank Trigger] Something entered the zone: {other.gameObject.name}");
-
         PlayerController3D player = other.GetComponent<Collider>().GetComponent<PlayerController3D>();
         if (player == null) player = other.GetComponentInParent<PlayerController3D>();
-
         if (player != null)
         {
-            Debug.Log("<color=green>[Tank Trigger]</color> SUCCESS: Found the PlayerController3D script!");
             isPlayerNearby = true;
             localPlayer = player;
             if (pressEPromptUI != null && !isViewingTank) pressEPromptUI.SetActive(true);
@@ -159,12 +168,10 @@ public class TankInteraction3D : MonoBehaviour
     {
         PlayerController3D player = other.GetComponent<Collider>().GetComponent<PlayerController3D>();
         if (player == null) player = other.GetComponentInParent<PlayerController3D>();
-
         if (player != null)
         {
-            Debug.Log("<color=orange>[Tank Trigger]</color> Player walked away from the tank.");
             isPlayerNearby = false;
-            localPlayer = null;
+            if (!isViewingTank) localPlayer = null;
             if (pressEPromptUI != null) pressEPromptUI.SetActive(false);
         }
     }

@@ -1,25 +1,40 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 public class AlgaeManager : MonoBehaviour
 {
-    [Header("Tracked Algae Zones")]
-    public AlgaeNode[] algaeNodes; // Drop your individual wall/floor objects here!
+    [Header("Node Tracking")]
+    [Tooltip("The list of AlgaeNode objects controlled by this specific manager.")]
+    public AlgaeNode[] algaeNodes;
 
-    // The snail will call this function to find out where it should go crawl next!
+    void Start()
+    {
+        // ===================================================================
+        // --- FIXED: AUTOMATIC LOCAL CHILD DISCOVERY ---
+        // Instead of relying on manual inspector drag-and-drops (which fail on duplication),
+        // this automatically finds every AlgaeNode inside this specific tank's branch.
+        // ===================================================================
+        algaeNodes = GetComponentsInChildren<AlgaeNode>(true);
+        
+        if (algaeNodes.Length == 0)
+        {
+            Debug.LogWarning($"[AlgaeManager] {gameObject.name} could not find any AlgaeNode children! Check your hierarchy.");
+        }
+    }
+
     public AlgaeNode GetDirtiestAlgaeNode()
     {
-        AlgaeNode dirtiestNode = null;
-        float highestAlgae = 0.05f; // Small threshold so snail doesn't chase 1% dirty spots
+        AlgaeNode dirtiest = null;
+        float highestAlgae = -1f;
 
         foreach (AlgaeNode node in algaeNodes)
         {
             if (node != null && node.currentAlgaeLevel > highestAlgae)
             {
                 highestAlgae = node.currentAlgaeLevel;
-                dirtiestNode = node;
+                dirtiest = node;
             }
         }
-
-        return dirtiestNode; // Returns the worst wall, or null if the tank is sparkling clean
+        return dirtiest;
     }
 }

@@ -49,15 +49,25 @@ public class SnailAI : MonoBehaviour
 
     void Start()
     {
-        // --- FIXED: PREVENT SQUASHING INJECTED BABY SCALE RULES ---
         if (originalScale == Vector3.zero)
         {
             originalScale = transform.localScale;
         }
 
         transform.position = new Vector3(transform.position.x, floorY, transform.position.z);
-        algaeManager = FindFirstObjectByType<AlgaeManager>();
-        aquariumManager = FindFirstObjectByType<AquariumManager>();
+        
+        // FIXED MULTI-TANK MANAGER HOOK: Locates the local sibling manager components
+        aquariumManager = GetComponentInParent<AquariumManager>();
+        if (aquariumManager != null)
+        {
+            algaeManager = aquariumManager.algaeManager;
+            if (algaeManager == null) algaeManager = aquariumManager.GetComponentInChildren<AlgaeManager>();
+        }
+        else
+        {
+            algaeManager = FindFirstObjectByType<AlgaeManager>();
+            aquariumManager = FindFirstObjectByType<AquariumManager>();
+        }
 
         PickRandomFloorTarget();
     }
@@ -164,7 +174,7 @@ public class SnailAI : MonoBehaviour
                 if (aquariumManager != null)
                 {
                     aquariumManager.totalMoney += coinsPerSwipe;
-                    aquariumManager.Invoke("UpdateMoneyUI", 0f); 
+                    aquariumManager.UpdateMoneyUI(); 
                 }
             }
             eatTimer = 0f;
@@ -203,7 +213,8 @@ public class SnailAI : MonoBehaviour
         currentTargetNode = null;
         hasWayPoint = false;
 
-        float pushDirectionX = (transform.position.x > 0f) ? -1f : 1f;
+        float parentX = transform.parent != null ? transform.parent.position.x : 0f;
+        float pushDirectionX = (transform.position.x > parentX) ? -1f : 1f;
         
         float chosenDistance = Random.Range(minPopOffDistance, maxPopOffDistance);
         Debug.Log($"<color=teal>[Snail Pop Off]</color> Calculated launch distance: <b>{chosenDistance:F2} units</b>.");
@@ -272,7 +283,9 @@ public class SnailAI : MonoBehaviour
 
     void PickRandomFloorTarget()
     {
-        float randomX = Random.Range(-6.5f, 6.5f);
+        // --- FIXED SNAIL MULTI-TANK FLOOR BOUNDARY ---
+        float parentX = transform.parent != null ? transform.parent.position.x : 0f;
+        float randomX = parentX + Random.Range(-6.5f, 6.5f);
         targetPosition = new Vector3(randomX, floorY, 0f);
     }
 
@@ -280,7 +293,8 @@ public class SnailAI : MonoBehaviour
     {
         if (Mathf.Abs(direction.y) > 0.7f)
         {
-            if (transform.position.x > 0f)
+            float checkThresholdX = transform.parent != null ? transform.parent.position.x : 0f;
+            if (transform.position.x > checkThresholdX)
             {
                 if (isEating)
                 {

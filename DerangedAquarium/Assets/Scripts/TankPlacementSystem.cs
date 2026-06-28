@@ -15,17 +15,42 @@ public class TankPlacementSystem : MonoBehaviour
 
     private TankEconomy economy;
     private TankShopUI shopUI;
+    
+    // Cached camera layer isolation link
+    private Camera localTankCamera;
+    
+    // Multi-tank visibility verification reference link
+    private AquariumManager manager;
 
     public void Initialize(TankEconomy targetEconomy, TankShopUI targetShopUI)
     {
         economy = targetEconomy;
         shopUI = targetShopUI;
+        
+        // Caches local camera directly parented inside this explicit manager layout setup
+        localTankCamera = GetComponentInChildren<Camera>(true);
+        
+        // Cache the master manager component attached to this GameObject node tree
+        manager = GetComponent<AquariumManager>();
     }
 
     void Update()
     {
+        // ===================================================================
+        // --- MULTI-TANK PLACEMENT PROTECTION SHIELD ---
+        // Prevents inactive background managers from spawning items or capturing
+        // clicks intended for the active showroom viewport layout.
+        // ===================================================================
+        if (manager != null && !manager.isTankVisible) return;
+
         if (isPlacingDecoration) HandleDecorationPlacement();
         else if (isPlacingItem) HandleItemPlacement();
+    }
+
+    private Camera GetActiveCamera()
+    {
+        // Replaces Camera.main since the 3D player camera component turns off inside aquarium view
+        return (localTankCamera != null && localTankCamera.enabled) ? localTankCamera : Camera.main;
     }
 
     public void StartDecorationPlacement(GameObject prefab, int cost)
@@ -39,7 +64,10 @@ public class TankPlacementSystem : MonoBehaviour
         shopUI.UpdateFeedButtonUI();
         shopUI.UpdateSpongeButtonUI();
 
-        Vector3 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+        Camera activeCam = GetActiveCamera();
+        if (activeCam == null) return;
+
+        Vector3 mousePos = activeCam.ScreenToWorldPoint(Input.mousePosition);
         mousePos.z = 0f;
 
         activeDecorationPreview = Instantiate(selectedDecorationPrefab, mousePos, Quaternion.identity, this.transform);
@@ -51,7 +79,10 @@ public class TankPlacementSystem : MonoBehaviour
 
     private void HandleDecorationPlacement()
     {
-        Vector3 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+        Camera activeCam = GetActiveCamera();
+        if (activeCam == null) return;
+
+        Vector3 mousePos = activeCam.ScreenToWorldPoint(Input.mousePosition);
         mousePos.z = 0f;
 
         if (activeDecorationPreview != null) activeDecorationPreview.transform.position = mousePos;
@@ -95,7 +126,10 @@ public class TankPlacementSystem : MonoBehaviour
         shopUI.UpdateFeedButtonUI();
         shopUI.UpdateSpongeButtonUI();
 
-        Vector3 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+        Camera activeCam = GetActiveCamera();
+        if (activeCam == null) return;
+
+        Vector3 mousePos = activeCam.ScreenToWorldPoint(Input.mousePosition);
         mousePos.z = 0f;
 
         activeItemPreview = Instantiate(selectedItemPrefab, mousePos, Quaternion.identity, this.transform);
@@ -104,7 +138,10 @@ public class TankPlacementSystem : MonoBehaviour
 
     private void HandleItemPlacement()
     {
-        Vector3 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+        Camera activeCam = GetActiveCamera();
+        if (activeCam == null) return;
+
+        Vector3 mousePos = activeCam.ScreenToWorldPoint(Input.mousePosition);
         mousePos.z = 0f;
 
         if (activeItemPreview != null) activeItemPreview.transform.position = mousePos;

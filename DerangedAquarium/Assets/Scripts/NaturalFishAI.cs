@@ -12,7 +12,7 @@ public class NaturalFishAI : MonoBehaviour
     public float swimSpeed = 1.2f;
     public float rushSpeedMultiplier = 1.5f; 
 
-    [Header("Tank Boundaries (Safe Zones)")]
+    [Header("Tank Boundaries (Safe Zones Relative to Parent)")]
     public Vector2 minBounds = new Vector2(-7.5f, -3.5f);
     public Vector2 maxBounds = new Vector2(7.5f, 3.5f);
 
@@ -33,12 +33,10 @@ public class NaturalFishAI : MonoBehaviour
     public float maxScale = 1.5f;          
     public float growthPerBite = 0.1f;     
     
-    // --- FIXED: EXPOSED DATA SCOPES FOR CONSOLE STORAGE LINKAGES ---
     [HideInInspector] public float currentScaleModifier;
     [HideInInspector] public Vector3 baseScale;
     [HideInInspector] public float facingDirectionSign = 1f;
 
-    // --- PUFFERFISH MECHANICS ---
     [Header("Pufferfish Mechanics")]
     public float puffInflationMultiplier = 1.8f; 
     public float puffLerpSpeed = 5f;            
@@ -62,7 +60,6 @@ public class NaturalFishAI : MonoBehaviour
     private bool isChasingFood = false;
     private SpriteRenderer spriteRenderer;
 
-    // --- ANTI-SPAM LOG COOLDOWN TIMER ---
     private float logCooldownTimer = 0f;
 
     void Start()
@@ -77,14 +74,8 @@ public class NaturalFishAI : MonoBehaviour
         }
         UpdateFishScale();
 
-        if (spriteRenderer != null)
-        {
-            originalColor = spriteRenderer.color;
-        }
-        else
-        {
-            originalColor = Color.white;
-        }
+        if (spriteRenderer != null) originalColor = spriteRenderer.color;
+        else originalColor = Color.white;
 
         PickNewDestination();
     }
@@ -120,7 +111,7 @@ public class NaturalFishAI : MonoBehaviour
 
         foreach (LivePlant plant in allPlants)
         {
-            if (plant.isHealthy)
+            if (plant.isHealthy && plant.transform.parent == this.transform.parent)
             {
                 totalHungerReduction += plant.hungerSlowdownPercent;
             }
@@ -142,25 +133,13 @@ public class NaturalFishAI : MonoBehaviour
             }
         }
 
-        if (currentHunger >= maxHunger)
-        {
-            Die();
-        }
+        if (currentHunger >= maxHunger) Die();
         else if (currentHunger >= hungerWarningTime)
         {
             float starvationProgress = (currentHunger - hungerWarningTime) / (maxHunger - hungerWarningTime);
-            if (spriteRenderer != null)
-            {
-                spriteRenderer.color = Color.Lerp(originalColor, sickColor, starvationProgress);
-            }
+            if (spriteRenderer != null) spriteRenderer.color = Color.Lerp(originalColor, sickColor, starvationProgress);
         }
-        else
-        {
-            if (spriteRenderer != null)
-            {
-                spriteRenderer.color = originalColor;
-            }
-        }
+        else if (spriteRenderer != null) spriteRenderer.color = originalColor;
     }
 
     void HandleFullness()
@@ -168,10 +147,7 @@ public class NaturalFishAI : MonoBehaviour
         if (isFull)
         {
             fullnessTimer -= Time.deltaTime;
-            if (fullnessTimer <= 0f)
-            {
-                isFull = false; 
-            }
+            if (fullnessTimer <= 0f) isFull = false; 
         }
     }
 
@@ -189,10 +165,7 @@ public class NaturalFishAI : MonoBehaviour
         if (isStartledByClick)
         {
             clickPuffTimer -= Time.deltaTime;
-            if (clickPuffTimer <= 0f)
-            {
-                isStartledByClick = false;
-            }
+            if (clickPuffTimer <= 0f) isStartledByClick = false;
         }
     }
 
@@ -235,6 +208,11 @@ public class NaturalFishAI : MonoBehaviour
         {
             if (food.transform.position.y <= food.floorYValue || food.isTargeted) continue;
 
+            if (food.transform.parent != null && transform.parent != null)
+            {
+                if (food.transform.parent.parent != transform.parent) continue;
+            }
+
             float distanceToFood = Vector3.Distance(transform.position, food.transform.position);
             if (distanceToFood < closestDistance)
             {
@@ -249,10 +227,7 @@ public class NaturalFishAI : MonoBehaviour
             currentFoodTarget.isTargeted = true; 
             isChasingFood = true;
         }
-        else
-        {
-            isChasingFood = false;
-        }
+        else isChasingFood = false;
     }
 
     void NavigateTank()
@@ -284,25 +259,16 @@ public class NaturalFishAI : MonoBehaviour
                 GrowFish();
                 SpawnMoneyReward();
 
-                // --- INTEGRATED: PROGRESS THE FISH-FEEDING QUEST ---
-                if (QuestManager.Instance != null)
-                {
-                    QuestManager.Instance.ProgressQuest("feed_fish", 1);
-                }
-
+                if (QuestManager.Instance != null) QuestManager.Instance.ProgressQuest("feed_fish", 1);
                 PickNewDestination(); 
             }
         }
-        else if (distanceToTarget < closeEnoughThreshold)
-        {
-            PickNewDestination();
-        }
+        else if (distanceToTarget < closeEnoughThreshold) PickNewDestination();
     }
 
     void HandleVisualFacing()
     {
         if (spriteRenderer == null) return;
-
         bool directionChanged = false;
 
         if (targetDestination.x > transform.position.x && facingDirectionSign != 1f)
@@ -316,20 +282,13 @@ public class NaturalFishAI : MonoBehaviour
             directionChanged = true;
         }
 
-        if (directionChanged)
-        {
-            UpdateFishScale();
-        }
+        if (directionChanged) UpdateFishScale();
     }
 
     void GrowFish()
     {
         currentScaleModifier += growthPerBite;
-        if (currentScaleModifier > maxScale)
-        {
-            currentScaleModifier = maxScale;
-        }
-
+        if (currentScaleModifier > maxScale) currentScaleModifier = maxScale;
         UpdateFishScale();
     }
 
@@ -342,48 +301,41 @@ public class NaturalFishAI : MonoBehaviour
         );
     }
 
+    // ===================================================================
+    // --- THE FIXED REWARD SPAWNER ---
+    // ===================================================================
     void SpawnMoneyReward()
     {
         if (moneyDropPrefab != null)
         {
             int calculatedPayout = 5; 
-
             switch (species)
             {
-                case FishType.Goldfish:
-                    calculatedPayout = 15;
-                    break;
-                case FishType.Tetra:
-                    calculatedPayout = 8;
-                    break;
-                case FishType.Angelfish:
-                    calculatedPayout = 45;
-                    break;
-                case FishType.Shark:
-                    calculatedPayout = 120;
-                    break;
-                case FishType.Pufferfish: 
-                    calculatedPayout = 30;
-                    break;
+                case FishType.Goldfish: calculatedPayout = 15; break;
+                case FishType.Tetra: calculatedPayout = 8; break;
+                case FishType.Angelfish: calculatedPayout = 45; break;
+                case FishType.Shark: calculatedPayout = 120; break;
+                case FishType.Pufferfish: calculatedPayout = 30; break;
             }
 
-            AquariumManager manager = FindFirstObjectByType<AquariumManager>();
-            Transform container = (manager != null) ? manager.GetBubbleContainer() : null;
+            // FIXED: Locate the container directly via the Hierarchy Tracker component on this fish's parent.
+            // This works even if the manager is currently disabled by the visibility script!
+            TankHierarchyTracker tracker = GetComponentInParent<TankHierarchyTracker>();
+            Transform container = (tracker != null) ? tracker.bubbleContainer : null;
 
             GameObject groundCoin = Instantiate(moneyDropPrefab, transform.position, Quaternion.identity, container);
             
             MoneyDropItem coinScript = groundCoin.GetComponent<MoneyDropItem>();
-            if (coinScript != null)
-            {
-                coinScript.cashValue = calculatedPayout;
-            }
+            if (coinScript != null) coinScript.cashValue = calculatedPayout;
         }
     }
 
     void PickNewDestination()
     {
-        float targetX = Random.Range(minBounds.x, maxBounds.x);
-        float targetY = Random.Range(minBounds.y, maxBounds.y);
+        Vector3 parentOffset = transform.parent != null ? transform.parent.position : Vector3.zero;
+        
+        float targetX = parentOffset.x + Random.Range(minBounds.x, maxBounds.x);
+        float targetY = parentOffset.y + Random.Range(minBounds.y, maxBounds.y);
         targetDestination = new Vector3(targetX, targetY, 0f);
     }
 
@@ -393,23 +345,16 @@ public class NaturalFishAI : MonoBehaviour
         spriteRenderer.color = new Color(0.3f, 0.3f, 0.3f, 0.7f);
         transform.rotation = Quaternion.Euler(0, 0, 180f);
 
-        AquariumManager manager = FindFirstObjectByType<AquariumManager>();
-        if (manager != null)
-        {
-            manager.DeductPlantedCash(15); 
-        }
-
-        if (currentFoodTarget != null)
-        {
-            currentFoodTarget.isTargeted = false;
-        }
-
+        AquariumManager manager = GetComponentInParent<AquariumManager>();
+        if (manager != null) manager.DeductPlantedCash(15); 
+        if (currentFoodTarget != null) currentFoodTarget.isTargeted = false;
         Destroy(gameObject, 8f);
     }
 
     void FloatToSurface()
     {
-        if (transform.position.y < maxBounds.y)
+        Vector3 parentOffset = transform.parent != null ? transform.parent.position : Vector3.zero;
+        if (transform.position.y < (parentOffset.y + maxBounds.y))
         {
             transform.Translate(Vector3.down * 0.8f * Time.deltaTime, Space.Self); 
         }

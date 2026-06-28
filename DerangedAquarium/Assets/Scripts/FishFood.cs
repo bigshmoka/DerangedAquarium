@@ -8,16 +8,8 @@ public class FishFood : MonoBehaviour
 
     [HideInInspector] public bool isTargeted = false;
 
-    // --- NEW: CHECK STATE AT BIRTH WORKFLOW ---
-    void Start()
-    {
-        AquariumManager manager = FindFirstObjectByType<AquariumManager>();
-        if (manager != null && !manager.isTankVisible)
-        {
-            SpriteRenderer sr = GetComponent<SpriteRenderer>();
-            if (sr != null) sr.enabled = false; // Spawns invisibly in the background
-        }
-    }
+    // REMOVED: The independent Start() visibility check.
+    // The AquariumManager will now handle toggling this renderer.
 
     void Update()
     {

@@ -21,8 +21,9 @@ public class ShopClickTab : MonoBehaviour
         if (tabRectTransform == null)
             tabRectTransform = GetComponent<RectTransform>();
             
+        // FIXED MULTI-TANK HOOK: Look up parent tree context nodes instead of sweeping globally
         if (aquariumManager == null)
-            aquariumManager = FindFirstObjectByType<AquariumManager>();
+            aquariumManager = GetComponentInParent<AquariumManager>();
 
         // Ensure the layout window container stays awake so it can move seamlessly
         if (aquariumManager != null && aquariumManager.shopMenuWindow != null)
@@ -49,7 +50,7 @@ public class ShopClickTab : MonoBehaviour
             Time.deltaTime * slideSpeed
         );
 
-        // --- FIX: Automatically slide away if the manager flags the shop as closed (e.g. after buying a fish) ---
+        // Automatically slide away if the manager flags the shop as closed (e.g. after buying a fish)
         if (aquariumManager != null && !aquariumManager.isShopOpen && isOpen)
         {
             ForceClose();
