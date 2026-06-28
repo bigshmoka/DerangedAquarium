@@ -365,21 +365,17 @@ public class DevConsole : MonoBehaviour
     {
         isConsoleOpen = !isConsoleOpen;
 
-        if (consolePanel != null)
-        {
-            consolePanel.SetActive(isConsoleOpen);
-        }
-
         PlayerController3D player = FindFirstObjectByType<PlayerController3D>();
 
         if (isConsoleOpen)
         {
+            if (consolePanel != null) consolePanel.SetActive(true);
             isDevDeleting2D = false;
 
             if (commandInputField != null)
             {
-                commandInputField.ActivateInputField();
                 commandInputField.text = ""; 
+                commandInputField.ActivateInputField();
             }
 
             if (player != null) player.SetPlayerLockState(true);
@@ -391,26 +387,48 @@ public class DevConsole : MonoBehaviour
         }
         else
         {
+            // ===================================================================
+            // --- THE FIX: CRITICAL CLOSING SHIELD ---
+            // 1. Release InputField selection and focus parameters FIRST while the components are still active.
+            // ===================================================================
             if (commandInputField != null) commandInputField.DeactivateInputField();
+
+            if (UnityEngine.EventSystems.EventSystem.current != null)
+            {
+                UnityEngine.EventSystems.EventSystem.current.SetSelectedGameObject(null);
+            }
+
+            // 2. NOW safely turn off the panel without triggering frame-delay overrides
+            if (consolePanel != null) consolePanel.SetActive(false);
 
             if (ghostTextMesh != null) ghostTextMesh.text = "";
             currentSuggestion = "";
 
             StorefrontShopUI storefrontShop = FindFirstObjectByType<StorefrontShopUI>();
-            AquariumManager aquariumManager = FindFirstObjectByType<AquariumManager>();
 
             if (player != null)
             {
                 bool isStoreShopOpen = (storefrontShop != null && storefrontShop.isShopOpen);
-                bool isViewingAquarium = (aquariumManager != null && aquariumManager.isTankVisible);
+                
+                // ===================================================================
+                // --- THE FIX: ABSOLUTE PHYSICAL CAMERA STATE TRACKING ---
+                // If your 3D look camera is inactive, you are physically inside a tank view.
+                // If your 3D look camera is active, you are walking the showroom floor.
+                // This replaces the broken single-manager variable checks!
+                // ===================================================================
+                bool isViewingAquarium = false;
+                if (player.playerCamera != null)
+                {
+                    isViewingAquarium = !player.playerCamera.gameObject.activeInHierarchy;
+                }
                 
                 bool shouldKeepMouseUnlocked = isStoreShopOpen || isViewingAquarium;
                 player.SetPlayerLockState(shouldKeepMouseUnlocked);
             }
             else
             {
-                Cursor.lockState = CursorLockMode.None;
-                Cursor.visible = true;
+                Cursor.lockState = CursorLockMode.Locked;
+                Cursor.visible = false;
             }
         }
     }
@@ -840,7 +858,6 @@ public class DevConsole : MonoBehaviour
         }
     }
 
-    // --- UPGRADED: THE 3D PLACED SHOP UTILITIES PURGE CLEANER ---
     private void ExecuteClearStorefrontItemsCheat()
     {
         GameObject KaplanContainer = GameObject.Find("--- PLACED 3D ITEMS ---");
@@ -855,7 +872,6 @@ public class DevConsole : MonoBehaviour
             }
         }
 
-        // FIXED: Now displays exact matching style formatting feedback as the 2D sweep command!
         Debug.Log($"<color=green>[Janitor Sweep 3D]</color> Vaporized <b>{objectsPurgedCount}</b> active placed items from the storefront showroom.");
     }
 

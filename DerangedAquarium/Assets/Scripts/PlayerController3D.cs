@@ -32,6 +32,21 @@ public class PlayerController3D : MonoBehaviour
 
     void Update()
     {
+        // ===================================================================
+        // --- THE FIX: THE CONTINUOUS CROSSHAIR GUARD LOCK ---
+        // If the player profile is unlocked (meaning you are walking the 3D room), 
+        // force the cursor to lock and remain hidden every frame. This completely
+        // overrides and suppresses next-frame anomalies from TextMeshPro input fields!
+        // ===================================================================
+        if (!isLocked)
+        {
+            if (Cursor.lockState != CursorLockMode.Locked)
+            {
+                Cursor.lockState = CursorLockMode.Locked;
+                Cursor.visible = false;
+            }
+        }
+
         if (isLocked) return;
 
         // 1. Handle Mouse Look Look Up/Down & Left/Right
@@ -115,9 +130,6 @@ public class PlayerController3D : MonoBehaviour
         }
         else
         {
-            // --- FIXED: FORCE IMMERSIVE CROSSHAIR LOCK ---
-            // Removed the problematic noclip condition wrap. Closing the console 
-            // or exiting shop layouts will now always correctly lock the pointer mesh!
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
         }

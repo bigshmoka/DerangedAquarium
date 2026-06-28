@@ -12,6 +12,15 @@ public class StorefrontPlacementSystem : MonoBehaviour
     [Header("Rotation Keybinds")]
     public KeyCode rotateHotkey = KeyCode.R;
 
+    // ===================================================================
+    // --- NEW: MANUAL HEIGHT ADJUSTMENT SLIDER HANDLE ---
+    // Exposes a slider in your Unity Inspector to easily raise or lower 
+    // placement objects manually if their mesh models clip the floor!
+    // ===================================================================
+    [Header("Manual Adjustment Tweaks")]
+    [Tooltip("Manually add a vertical offset value if your prefab model clips or sinks through the floor mesh.")]
+    public float manualHeightOffset = 0f;
+
     private GameObject ghostPreviewInstance;
     private GameObject selectedPrefab;
     private int currentItemCost;
@@ -40,14 +49,31 @@ public class StorefrontPlacementSystem : MonoBehaviour
     {
         if (prefab == null) return;
 
+        TankInteraction3D tankComp = prefab.GetComponentInChildren<TankInteraction3D>();
+        if (tankComp != null && tankComp.tankID != "Unassigned_Tank")
+        {
+            TankInteraction3D[] existingTanks = FindObjectsByType<TankInteraction3D>(FindObjectsSortMode.None);
+            foreach (TankInteraction3D existing in existingTanks)
+            {
+                if (existing.tankID == tankComp.tankID)
+                {
+                    Debug.LogWarning($"<color=red>[Placement Block]</color> Placement Aborted! A unique fish tank with variation ID '<b>{tankComp.tankID}</b>' already exists inside your showroom layout registry!");
+                    
+                    StorefrontShopUI shopUI = FindFirstObjectByType<StorefrontShopUI>();
+                    if (shopUI != null) shopUI.ForceCloseShop();
+                    return;
+                }
+            }
+        }
+
         StorefrontRemovalSystem removalSystem = FindFirstObjectByType<StorefrontRemovalSystem>();
         if (removalSystem != null)
         {
             removalSystem.ExitRemovalMode();
         }
 
-        StorefrontShopUI shopUI = FindFirstObjectByType<StorefrontShopUI>();
-        if (shopUI != null) shopUI.ForceCloseShop();
+        StorefrontShopUI shopUIInstance = FindFirstObjectByType<StorefrontShopUI>();
+        if (shopUIInstance != null) shopUIInstance.ForceCloseShop();
 
         selectedPrefab = prefab;
         currentItemCost = cost;
@@ -63,6 +89,12 @@ public class StorefrontPlacementSystem : MonoBehaviour
         foreach (Collider col in ghostColliders)
         {
             col.enabled = false;
+        }
+
+        TankInteraction3D ghostTankComp = ghostPreviewInstance.GetComponentInChildren<TankInteraction3D>();
+        if (ghostTankComp != null)
+        {
+            ghostTankComp.enabled = false;
         }
 
         isPlacing = true;
@@ -92,10 +124,19 @@ public class StorefrontPlacementSystem : MonoBehaviour
             ghostPreviewInstance.SetActive(true);
             ghostPreviewInstance.transform.position = surfaceHit.point;
             
+            // Align rotation with surface vectors
             Quaternion floorSlopeAlignment = Quaternion.FromToRotation(Vector3.up, surfaceHit.normal);
             Quaternion playerRotationOffset = Quaternion.Euler(0f, customRotationY, 0f);
             
             ghostPreviewInstance.transform.rotation = floorSlopeAlignment * playerRotationOffset;
+
+            // --- FIXED: ADDED MANUAL VERTICAL MODIFIER CO-ORDINATES ---
+            Renderer ghostRend = ghostPreviewInstance.GetComponentInChildren<Renderer>();
+            if (ghostRend != null)
+            {
+                float shortFallOffset = surfaceHit.point.y - ghostRend.bounds.min.y;
+                ghostPreviewInstance.transform.position += new Vector3(0f, shortFallOffset + manualHeightOffset, 0f);
+            }
         }
         else
         {
@@ -112,6 +153,14 @@ public class StorefrontPlacementSystem : MonoBehaviour
                 Quaternion playerRotationOffset = Quaternion.Euler(0f, customRotationY, 0f);
                 
                 ghostPreviewInstance.transform.rotation = floorSlopeAlignment * playerRotationOffset;
+
+                // --- FIXED: ADDED MANUAL VERTICAL MODIFIER FOR FALLBACK SURFACE TRACKING ---
+                Renderer ghostRend = ghostPreviewInstance.GetComponentInChildren<Renderer>();
+                if (ghostRend != null)
+                {
+                    float shortFallOffset = downHit.point.y - ghostRend.bounds.min.y;
+                    ghostPreviewInstance.transform.position += new Vector3(0f, shortFallOffset + manualHeightOffset, 0f);
+                }
             }
             else
             {
@@ -124,6 +173,23 @@ public class StorefrontPlacementSystem : MonoBehaviour
     {
         if (ghostPreviewInstance == null || !ghostPreviewInstance.activeSelf) return;
         if (GlobalEconomyManager.Instance == null) return;
+
+        TankInteraction3D tankComp = selectedPrefab.GetComponentInChildren<TankInteraction3D>();
+        if (tankComp != null && tankComp.tankID != "Unassigned_Tank")
+        {
+            TankInteraction3D[] existingTanks = FindObjectsByType<TankInteraction3D>(FindObjectsSortMode.None);
+            foreach (TankInteraction3D existing in existingTanks)
+            {
+                if (ghostPreviewInstance != null && existing.transform.IsChildOf(ghostPreviewInstance.transform)) continue;
+
+                if (existing.tankID == tankComp.tankID)
+                {
+                    Debug.LogWarning($"<color=red>[Placement Block]</color> Double validation breach! Tank variation ID '<b>{tankComp.tankID}</b>' already occupies a physical showroom asset layout!");
+                    CancelPlacement();
+                    return;
+                }
+            }
+        }
 
         if (GlobalEconomyManager.Instance.TrySpendMoney(currentItemCost))
         {
@@ -142,7 +208,16 @@ public class StorefrontPlacementSystem : MonoBehaviour
             PlacedItemData itemData = placedObject.AddComponent<PlacedItemData>();
             itemData.originalCost = currentItemCost;
 
-            // --- INTEGRATED: PROGRESS THE 3D PLACEMENT QUEST ---
+            TankInteraction3D placedTankComp = placedObject.GetComponentInChildren<TankInteraction3D>();
+            if (placedTankComp != null)
+            {
+                placedTankComp.enabled = true;
+                if (placedTankComp.tankID != "Unassigned_Tank")
+                {
+                    placedTankComp.InitializeRuntimeTank(placedTankComp.tankID);
+                }
+            }
+
             if (QuestManager.Instance != null)
             {
                 QuestManager.Instance.ProgressQuest("place_decor", 1);
@@ -174,7 +249,6 @@ public class StorefrontPlacementSystem : MonoBehaviour
         if (player != null) player.SetPlayerLockState(false);
     }
 
-    // --- RESTORED: GHOST TRANSPARENCY SHADER FILTER ENGINE ---
     private void ApplyGhostTransparency(GameObject target, float alphaValue)
     {
         Renderer[] targetRenderers = target.GetComponentsInChildren<Renderer>();

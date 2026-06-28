@@ -4,12 +4,11 @@ using UnityEngine.SceneManagement;
 public class TankInteraction3D : MonoBehaviour
 {
     [Header("Scene Configuration")]
-    [Tooltip("The EXACT string name of your existing 2D Aquarium scene file.")]
     public string aquariumSceneName = "AquariumScene";
 
     [Header("Tank Multi-Instance Tracking")]
-    [Tooltip("Give this specific physical 3D prop a unique ID that matches its 2D simulation counterpart.")]
-    public string tankID = "StarterTank";
+    [Tooltip("This will be assigned dynamically by the 3D shop placement system!")]
+    public string tankID = "Unassigned_Tank";
 
     [Header("UI Prompt")]
     public GameObject pressEPromptUI;
@@ -20,17 +19,29 @@ public class TankInteraction3D : MonoBehaviour
     
     private AquariumManager myPaired2DManager;
     private static bool isSceneLoading = false;
+    private bool isInitialized = false;
 
     void Start()
     {
         if (pressEPromptUI != null) pressEPromptUI.SetActive(false);
+        
+        if (tankID != "Unassigned_Tank")
+        {
+            InitializeRuntimeTank(tankID);
+        }
+    }
+
+    public void InitializeRuntimeTank(string newTankID)
+    {
+        tankID = newTankID;
+        isInitialized = true;
 
         Scene aquariumScene = SceneManager.GetSceneByName(aquariumSceneName);
         
         if (!aquariumScene.isLoaded && !isSceneLoading)
         {
             isSceneLoading = true;
-            Debug.Log($"<color=yellow>[Scene Loader]</color> Initialization sweep: Loading additive scene <b>{aquariumSceneName}</b>...");
+            Debug.Log($"<color=yellow>[Shop Runtime]</color> Spawning prefab instance. Loading scene: <b>{aquariumSceneName}</b>...");
             SceneManager.LoadScene(aquariumSceneName, LoadSceneMode.Additive);
             StartCoroutine(InitializeTankVisibilityOnStart());
         }
@@ -67,25 +78,36 @@ public class TankInteraction3D : MonoBehaviour
 
     private void LocateMyPaired2DManager()
     {
-        AquariumManager[] allManagers = FindObjectsByType<AquariumManager>(FindObjectsSortMode.None);
+        // ===================================================================
+        // --- FIXED: DORMANT ASSET RESOLUTION ---
+        // Includes inactive objects in the type scan so it can locate 
+        // expansions that have put themselves to sleep on scene startup!
+        // ===================================================================
+        AquariumManager[] allManagers = FindObjectsByType<AquariumManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         foreach (AquariumManager manager in allManagers)
         {
             if (manager != null && manager.tankID == this.tankID)
             {
                 myPaired2DManager = manager;
-                Debug.Log($"<color=green>[Link Success]</color> Physical 3D Prop <b>{gameObject.name}</b> successfully linked to 2D Manager for <b>{tankID}</b>!");
+                
+                // Wake up the simulation tree hierarchy now that placement is authorized!
+                myPaired2DManager.gameObject.SetActive(true);
+                
+                Debug.Log($"<color=green>[Link Success]</color> Placed Prefab Shell successfully bound and activated 2D workspace: <b>{tankID}</b>!");
                 break;
             }
         }
 
         if (myPaired2DManager == null)
         {
-            Debug.LogError($"<color=red>[Link Failure]</color> Physical 3D Prop <b>{gameObject.name}</b> could not find a matching 2D manager with tankID: '{tankID}'!");
+            Debug.LogError($"<color=red>[Link Failure]</color> Placed Prefab shell couldn't find a 2D template named: '{tankID}'!");
         }
     }
 
     void Update()
     {
+        if (!isInitialized) return; 
+
         if (isPlayerNearby && !isViewingTank && Input.GetKeyDown(KeyCode.E)) EnterAquariumView();
         else if (isViewingTank && Input.GetKeyDown(KeyCode.Q)) ExitAquariumView();
     }
@@ -93,8 +115,6 @@ public class TankInteraction3D : MonoBehaviour
     void EnterAquariumView()
     {
         isViewingTank = true;
-        Debug.Log($"<color=cyan>[View State]</color> Opening view for: <b>{tankID}</b>. Shifting camera matrices and freeing system cursor.");
-
         if (pressEPromptUI != null) pressEPromptUI.SetActive(false);
         if (localPlayer != null) localPlayer.SetPlayerLockState(true);
         if (Camera.main != null) Camera.main.gameObject.SetActive(false);
@@ -111,8 +131,6 @@ public class TankInteraction3D : MonoBehaviour
     void ExitAquariumView()
     {
         isViewingTank = false;
-        Debug.Log($"<color=cyan>[View State]</color> Closing view for: <b>{tankID}</b>. Restoring 3D Player viewport and locking mouse controller.");
-
         if (localPlayer == null) localPlayer = FindFirstObjectByType<PlayerController3D>();
 
         if (localPlayer != null)
@@ -141,10 +159,9 @@ public class TankInteraction3D : MonoBehaviour
         if (myPaired2DManager == null) LocateMyPaired2DManager();
         if (myPaired2DManager == null) return;
 
-        // Aggressive background shielding loop
         if (makeVisible)
         {
-            AquariumManager[] allManagers = FindObjectsByType<AquariumManager>(FindObjectsSortMode.None);
+            AquariumManager[] allManagers = FindObjectsByType<AquariumManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
             foreach (AquariumManager mgr in allManagers)
             {
                 if (mgr != myPaired2DManager)
@@ -168,8 +185,6 @@ public class TankInteraction3D : MonoBehaviour
         {
             r.enabled = makeVisible;
         }
-
-        Debug.Log($"<color=magenta>[Visibility System]</color> Forced explicit assets for <b>{tankID}</b> to: <b>{makeVisible}</b>");
     }
 
     void OnTriggerEnter(Collider other)
@@ -181,10 +196,7 @@ public class TankInteraction3D : MonoBehaviour
         {
             isPlayerNearby = true;
             localPlayer = player;
-            
-            // RESTORED: Entering Range Diagnostic Log
-            Debug.Log($"<color=green>[Trigger Zone]</color> Player entered proximity radius of 3D Prop for tank: <b>{tankID}</b>. Prompting UI overlay display.");
-            
+            Debug.Log($"<color=green>[Trigger Zone]</color> Near placed shell: <b>{tankID}</b>");
             if (pressEPromptUI != null && !isViewingTank) pressEPromptUI.SetActive(true);
         }
     }
@@ -197,10 +209,7 @@ public class TankInteraction3D : MonoBehaviour
         if (player != null)
         {
             isPlayerNearby = false;
-            
-            // RESTORED: Leaving Range Diagnostic Log
-            Debug.Log($"<color=orange>[Trigger Zone]</color> Player exited proximity radius of 3D Prop for tank: <b>{tankID}</b>. Suppressing UI overlay display.");
-            
+            Debug.Log($"<color=orange>[Trigger Zone]</color> Left placed shell: <b>{tankID}</b>");
             if (!isViewingTank) localPlayer = null;
             if (pressEPromptUI != null) pressEPromptUI.SetActive(false);
         }

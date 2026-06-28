@@ -25,15 +25,12 @@ public class AquariumManager : MonoBehaviour
     public Button spongeToolButton;     
     public TMP_Text spongeToolText;     
 
-    [HideInInspector] public bool isTankVisible = true;
+    [HideInInspector] public bool isTankVisible = false;
 
     [Header("Multi-Tank Core Settings")]
     public string tankID = "StarterTank";
     public AlgaeManager algaeManager;
 
-    // =========================================================
-    // --- THE FIX: EXPLICIT HARD LINKS ---
-    // =========================================================
     [Header("Visual Links (Assign in Inspector!)")]
     [Tooltip("Drag THIS tank's specific 2D Camera here.")]
     public Camera tankCamera;
@@ -85,9 +82,19 @@ public class AquariumManager : MonoBehaviour
         placementSystem.Initialize(economy, shopUI);
         inputHandler.Initialize(shopUI, placementSystem, hierarchyTracker);
 
-        // Alert you if you forgot to link them in the editor!
         if (tankCamera == null) Debug.LogError($"[Tank Fix] You forgot to drag the Camera into the {gameObject.name} manager!");
         if (mainTankCanvas == null) Debug.LogError($"[Tank Fix] You forgot to drag the Canvas into the {gameObject.name} manager!");
+
+        // ===================================================================
+        // --- THE HIBERNATION FIX ---
+        // If this expansion layout instance is additively awoken on bootup, 
+        // force it into complete hibernation. It will wait until the 3D player 
+        // physically finalizes placement before running initialization or ticking!
+        // ===================================================================
+        if (tankID != "StarterTank")
+        {
+            gameObject.SetActive(false);
+        }
     }
 
     void Start()
@@ -106,6 +113,7 @@ public class AquariumManager : MonoBehaviour
 
         if (errorNotificationText != null) errorNotificationText.gameObject.SetActive(false);
 
+        // This spawning block now fires cleanly only when the tank is activated
         if (fishPrefab != null)
         {
             SpawnBabyFish(fishPrefab, new Vector3(-2f, 0f, 0f));
@@ -143,7 +151,7 @@ public class AquariumManager : MonoBehaviour
 
         int uiLayerIndex = LayerMask.NameToLayer("UI");
 
-        Camera[] allCameras = FindObjectsByType<Camera>(FindObjectsSortMode.None);
+        Camera[] allCameras = FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         foreach (Camera cam in allCameras)
         {
             if (cam.orthographic && (cam.name.Contains("Aquarium") || cam.name.Contains("Tank") || (cam.cullingMask & (1 << aqLayerIndex)) != 0))
@@ -155,9 +163,6 @@ public class AquariumManager : MonoBehaviour
         }
     }
 
-    // =========================================================
-    // --- SYNTAX ERROR FIXED: Using standard curly brackets ---
-    // =========================================================
     public void UpdateMoneyUI()
     {
         if (economy != null) economy.UpdateBalanceUI();
