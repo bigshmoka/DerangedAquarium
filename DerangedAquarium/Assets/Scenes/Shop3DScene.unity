@@ -623,7 +623,7 @@ GameObject:
   - component: {fileID: 105745279}
   - component: {fileID: 105745278}
   - component: {fileID: 105745277}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Plane (5)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -2493,7 +2493,7 @@ GameObject:
   - component: {fileID: 389347266}
   - component: {fileID: 389347265}
   - component: {fileID: 389347264}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Plane (6)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -2794,7 +2794,7 @@ GameObject:
   - component: {fileID: 424169228}
   - component: {fileID: 424169227}
   - component: {fileID: 424169226}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Plane (3)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -3075,7 +3075,7 @@ Transform:
   m_GameObject: {fileID: 424169225}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -5.21, y: 0, z: -25.36}
+  m_LocalPosition: {x: -5.14, y: 0, z: -25.36}
   m_LocalScale: {x: 0.45199, y: 0.45199, z: 0.45199}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -5017,7 +5017,7 @@ GameObject:
   - component: {fileID: 636334737}
   - component: {fileID: 636334736}
   - component: {fileID: 636334735}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Plane
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -7260,6 +7260,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerController3D
   moveSpeed: 5
   mouseSensitivity: 2
+  sprintSpeed: 8.5
+  crouchSpeed: 2.5
+  jumpForce: 4
+  crouchLerpSpeed: 10
+  customGravity: -15
   playerCamera: {fileID: 1695292279}
 --- !u!54 &921047830
 Rigidbody:
@@ -7297,7 +7302,7 @@ Transform:
   m_GameObject: {fileID: 921047828}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -19.94, y: 1.58, z: 0.02}
+  m_LocalPosition: {x: -12.86, y: 1.454, z: 0.02}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -7339,7 +7344,7 @@ GameObject:
   - component: {fileID: 936360853}
   - component: {fileID: 936360852}
   - component: {fileID: 936360851}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Plane (7)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -7620,7 +7625,7 @@ Transform:
   m_GameObject: {fileID: 936360850}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -5.21, y: 0, z: 36.276}
+  m_LocalPosition: {x: -5.12, y: 0, z: 36.276}
   m_LocalScale: {x: 0.45199, y: 0.45199, z: 0.20298484}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -11132,7 +11137,7 @@ GameObject:
   - component: {fileID: 1511118520}
   - component: {fileID: 1511118519}
   - component: {fileID: 1511118518}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Plane (2)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -11413,7 +11418,7 @@ Transform:
   m_GameObject: {fileID: 1511118517}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -19.04, y: 0, z: -25.36}
+  m_LocalPosition: {x: -19, y: 0, z: -25.36}
   m_LocalScale: {x: 0.45199, y: 0.45199, z: 0.45199}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -12720,7 +12725,7 @@ GameObject:
   - component: {fileID: 1680109716}
   - component: {fileID: 1680109715}
   - component: {fileID: 1680109714}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Plane (1)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -14272,7 +14277,7 @@ GameObject:
   - component: {fileID: 2073274863}
   - component: {fileID: 2073274862}
   - component: {fileID: 2073274861}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Plane (4)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -14553,7 +14558,7 @@ Transform:
   m_GameObject: {fileID: 2073274860}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -5.21, y: 0, z: 10.46}
+  m_LocalPosition: {x: -5.13, y: 0, z: 10.46}
   m_LocalScale: {x: 0.45199, y: 0.45199, z: 0.45199}
   m_ConstrainProportionsScale: 0
   m_Children: []
