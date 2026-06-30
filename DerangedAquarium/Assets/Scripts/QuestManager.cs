@@ -59,6 +59,18 @@ public class QuestManager : MonoBehaviour
     {
         masterQuestChain.Clear();
 
+        // ===================================================================
+    // STAGE 0: THE GRAND OPENING CLEANUP (NEW)
+    // Demands 5 pieces of trash be swept up. Your GlobalEconomyManager starts at $100.
+    // Rewarding $400 gives the player a grand total of $500 to comfortably buy a tank shell!
+    // ===================================================================
+    masterQuestChain.Add(new Quest { 
+        questID = "clean_trash", 
+        description = "Prepare the showroom floor (Clean up shop clutter)", 
+        targetCount = 5, 
+        cashReward = 400 
+    });
+
         // Stage 1: The Basics (Aquarium Introduction)
         masterQuestChain.Add(new Quest { questID = "feed_fish", description = "Get familiar with your tank (Feed fish 3 times)", targetCount = 3, cashReward = 300 });
         masterQuestChain.Add(new Quest { questID = "buy_creatures", description = "Expand your collection (Buy your first new creature)", targetCount = 1, cashReward = 600 });

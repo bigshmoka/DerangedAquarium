@@ -92,6 +92,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::QuestManager
   masterQuestChain:
+  - questID: clean_trash
+    description: clean 5 pieces of trash to start
+    targetCount: 5
+    cashReward: 400
+    currentCount: 0
+    isCompleted: 0
   - questID: feed_fish
     description: Get familiar with your tank (feed 3 fish)
     targetCount: 3
