@@ -123,6 +123,12 @@ MonoBehaviour:
     cashReward: 400
     currentCount: 0
     isCompleted: 0
+  - questID: open_building
+    description: goto your closed sign and click on it to open your shop!
+    targetCount: 1
+    cashReward: 300
+    currentCount: 0
+    isCompleted: 0
   activeQuests: []
 --- !u!114 &3829945471948997931
 MonoBehaviour:
