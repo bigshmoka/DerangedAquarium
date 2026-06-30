@@ -6,7 +6,13 @@ public class HUD3DController : MonoBehaviour
     [Header("3D Storefront HUD Setup")]
     public TMP_Text storefrontMoneyText;
 
-    // --- NEW: CROSSHAIR SLOT ---
+    // --- NEW: PROGRESSION HUD TEXT ELEMENTS ---
+    [Tooltip("Drag your TextMeshPro element for Museum Level here (e.g. 'Level 1').")]
+    public TMP_Text storefrontLevelText;
+    [Tooltip("Drag your TextMeshPro element for XP tracking here (e.g. 'XP: 45 / 100').")]
+    public TMP_Text storefrontXPText;
+
+    [Header("Crosshair Configuration")]
     [Tooltip("Drag your UI Crosshair Dot Image game object here.")]
     public GameObject crosshairVisualObject;
 
@@ -17,6 +23,9 @@ public class HUD3DController : MonoBehaviour
         {
             GlobalEconomyManager.Instance.RegisterWalletDisplay(storefrontMoneyText);
         }
+
+        // --- NEW: FETCH INITIAL VALUES UPON SPAWNING ---
+        UpdatePrestigeVisuals();
     }
 
     void OnDestroy()
@@ -28,6 +37,29 @@ public class HUD3DController : MonoBehaviour
         }
     }
 
+    // ===================================================================
+    // --- NEW: DYNAMIC PROGRESSION REPAINT ENGINE ---
+    // Reads directly from your global level manager to redraw numbers live on screen!
+    // ===================================================================
+    public void UpdatePrestigeVisuals()
+    {
+        if (ExhibitPrestigeManager.Instance == null) return;
+
+        int currentLvl = ExhibitPrestigeManager.Instance.currentLevel;
+        int currentXP = ExhibitPrestigeManager.Instance.currentPrestigePoints;
+        int requiredXP = currentLvl * ExhibitPrestigeManager.Instance.pointsPerLevelMultiplier;
+
+        if (storefrontLevelText != null)
+        {
+            storefrontLevelText.text = $"Level {currentLvl}";
+        }
+
+        if (storefrontXPText != null)
+        {
+            storefrontXPText.text = $"XP: {currentXP} / {requiredXP}";
+        }
+    }
+
     // Controls HUD visibility contextually when jumping into the 2D fish tank view
     public void SetMoneyTextVisibility(bool isVisible)
     {
@@ -36,9 +68,11 @@ public class HUD3DController : MonoBehaviour
             storefrontMoneyText.gameObject.SetActive(isVisible);
         }
 
-        // --- NEW: AUTO-TOGGLE CROSSHAIR VISIBILITY ---
-        // This makes sure the crosshair disappears when looking into the 2D tank
-        // and returns seamlessly when you press Q to walk around the 3D store!
+        // --- NEW: AUTOMATICALLY FLUSH PROGRESSION LABELS ON VIEW SWITCHES ---
+        // Ensures your level readouts don't float clumsily over your 2D decorations!
+        if (storefrontLevelText != null) storefrontLevelText.gameObject.SetActive(isVisible);
+        if (storefrontXPText != null) storefrontXPText.gameObject.SetActive(isVisible);
+
         if (crosshairVisualObject != null)
         {
             crosshairVisualObject.SetActive(isVisible);
