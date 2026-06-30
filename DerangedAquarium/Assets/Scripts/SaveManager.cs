@@ -19,6 +19,13 @@ public class GameSaveData
     
     public int questChainIndex = 0;
     public int questCurrentCount = 0;
+
+    // ===================================================================
+    // --- INTEGRATED: PUBLIC SANCTUARY PROGRESSION RECORDS ---
+    // ===================================================================
+    public int museumLevel = 1;
+    public int museumPrestigePoints = 0;
+    public int museumEntranceFee = 15;
 }
 
 [System.Serializable]
@@ -35,10 +42,12 @@ public class AquariumItemDataWrapper
 {
     public string prefabResourceName;
     public Vector3 position;
-    public Vector3 localScale; 
+    public Vector3 localScale;
+
     public float fishScaleModifier;
     public Vector3 fishBaseScale;
-    public float fishFacingSign = 1f; 
+    public float fishFacingSign = 1f;
+
     public float fishHunger = 0f;
     public bool fishIsFull = false;
     public float fishFullnessTimer = 0f;
@@ -60,15 +69,12 @@ public class TankAlgaeSaveData
 public class SaveManager : MonoBehaviour
 {
     public static SaveManager Instance { get; private set; }
-
     private string saveFilePath;
-
     private FieldInfo fishHungerField;
     private FieldInfo fishIsFullField;
     private FieldInfo fishFullnessTimerField;
     private FieldInfo questChainIndexField;
     private MethodInfo questLoadMethod;
-
     private GameObject cached3DItemContainer;
 
     void Awake()
@@ -80,7 +86,6 @@ public class SaveManager : MonoBehaviour
         }
         Instance = this;
         saveFilePath = Path.Combine(Application.persistentDataPath, "storefront_save.json");
-
         InitializeReflectionCache();
     }
 
@@ -95,7 +100,6 @@ public class SaveManager : MonoBehaviour
         fishHungerField = typeof(NaturalFishAI).GetField("currentHunger", BindingFlags.Instance | BindingFlags.NonPublic);
         fishIsFullField = typeof(NaturalFishAI).GetField("isFull", BindingFlags.Instance | BindingFlags.NonPublic);
         fishFullnessTimerField = typeof(NaturalFishAI).GetField("fullnessTimer", BindingFlags.Instance | BindingFlags.NonPublic);
-
         questChainIndexField = typeof(QuestManager).GetField("currentChainIndex", BindingFlags.Instance | BindingFlags.NonPublic);
         questLoadMethod = typeof(QuestManager).GetMethod("LoadCurrentQuestFromChain", BindingFlags.Instance | BindingFlags.NonPublic);
     }
@@ -112,7 +116,6 @@ public class SaveManager : MonoBehaviour
     public void SaveGame()
     {
         if (GlobalEconomyManager.Instance == null) return;
-
         GameSaveData dataToSave = new GameSaveData { walletBalance = GlobalEconomyManager.Instance.GetBalance() };
 
         // 1. Serialize 3D placed shop furniture elements
@@ -135,19 +138,13 @@ public class SaveManager : MonoBehaviour
             }
         }
 
-        // ===================================================================
-        // --- FIXED: INACTIVE SPECTRUM SAVE SCAN ---
-        // Forces the serialization script to check dormant, inactive background 
-        // objects so expand-zone tycoon setups save cleanly!
-        // ===================================================================
+        // 2. Serialize creatures and local upgrades inside explicit containers
         AquariumManager[] allTanks = FindObjectsByType<AquariumManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         foreach (AquariumManager tankManager in allTanks)
         {
             if (tankManager == null) continue;
-
             string currentTankID = tankManager.tankID;
 
-            // Serialize creatures and local upgrades inside this explicit container
             foreach (Transform child in tankManager.transform)
             {
                 bool isFish = child.GetComponent<NaturalFishAI>() != null || child.name.Contains("Fish");
@@ -162,7 +159,7 @@ public class SaveManager : MonoBehaviour
                         prefabResourceName = child.name.Replace("(Clone)", "").Replace("_Placed", "").Trim(),
                         position = child.position,
                         localScale = child.localScale,
-                        assignedTankID = currentTankID // Stamp item with its matching home tank ID!
+                        assignedTankID = currentTankID 
                     };
 
                     NaturalFishAI fishAI = child.GetComponent<NaturalFishAI>();
@@ -171,7 +168,6 @@ public class SaveManager : MonoBehaviour
                         aqWrapper.fishScaleModifier = fishAI.currentScaleModifier;
                         aqWrapper.fishBaseScale = fishAI.baseScale;
                         aqWrapper.fishFacingSign = fishAI.facingDirectionSign;
-
                         if (fishHungerField != null) aqWrapper.fishHunger = (float)fishHungerField.GetValue(fishAI);
                         if (fishIsFullField != null) aqWrapper.fishIsFull = (bool)fishIsFullField.GetValue(fishAI);
                         if (fishFullnessTimerField != null) aqWrapper.fishFullnessTimer = (float)fishFullnessTimerField.GetValue(fishAI);
@@ -187,7 +183,6 @@ public class SaveManager : MonoBehaviour
             // Serialize Algae levels for this specific tank container structure
             AlgaeManager algaeManager = tankManager.algaeManager;
             if (algaeManager == null) algaeManager = tankManager.GetComponentInChildren<AlgaeManager>();
-
             if (algaeManager != null && algaeManager.algaeNodes != null)
             {
                 TankAlgaeSaveData algaeRecord = new TankAlgaeSaveData { tankID = currentTankID };
@@ -209,6 +204,16 @@ public class SaveManager : MonoBehaviour
             }
         }
 
+        // ===================================================================
+        // --- INTEGRATED: SAVE PUBLIC SANCTUARY RANK STATISTICS ---
+        // ===================================================================
+        if (ExhibitPrestigeManager.Instance != null)
+        {
+            dataToSave.museumLevel = ExhibitPrestigeManager.Instance.currentLevel;
+            dataToSave.museumPrestigePoints = ExhibitPrestigeManager.Instance.currentPrestigePoints;
+            dataToSave.museumEntranceFee = ExhibitPrestigeManager.Instance.currentEntranceFee;
+        }
+
         File.WriteAllText(saveFilePath, JsonUtility.ToJson(dataToSave, true));
         Debug.Log($"<color=green>[Save System]</color> Multi-Tank Structural Groundwork Saved Successfully.");
     }
@@ -217,7 +222,6 @@ public class SaveManager : MonoBehaviour
     {
         if (!File.Exists(saveFilePath)) return;
         if (GlobalEconomyManager.Instance == null) return;
-
         GameSaveData loadedData = JsonUtility.FromJson<GameSaveData>(File.ReadAllText(saveFilePath));
 
         // Sync Wallet
@@ -242,7 +246,6 @@ public class SaveManager : MonoBehaviour
                 loadedInstance.name = savedItem.prefabResourceName + "_Placed";
                 loadedInstance.AddComponent<PlacedItemData>().originalCost = savedItem.originalCost;
 
-                // Wire up loaded 3D prefab shells to trigger their template scene mapping chains
                 TankInteraction3D loadedTankComp = loadedInstance.GetComponentInChildren<TankInteraction3D>();
                 if (loadedTankComp != null)
                 {
@@ -255,12 +258,7 @@ public class SaveManager : MonoBehaviour
             }
         }
 
-        // ===================================================================
-        // --- FIXED: INACTIVE ALL-TANK SCANNING AND SPAWN SHIELDING ---
-        // 1. Scans ALL active and inactive tanks in your memory architecture.
-        // 2. Activates 'skipDefaultSpawn = true' on every single one.
-        // This ensures waking up a tank NEVER drops duplicate default fish!
-        // ===================================================================
+        // Block the starter fish trigger from duplicate drops
         AquariumManager[] allTanks = FindObjectsByType<AquariumManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         Dictionary<string, AquariumManager> tankMap = new Dictionary<string, AquariumManager>();
         
@@ -268,7 +266,7 @@ public class SaveManager : MonoBehaviour
         {
             if (tank != null)
             {
-                tank.skipDefaultSpawn = true; // Block the starter fish trigger!
+                tank.skipDefaultSpawn = true; 
                 if (!tankMap.ContainsKey(tank.tankID)) tankMap.Add(tank.tankID, tank);
             }
         }
@@ -296,7 +294,6 @@ public class SaveManager : MonoBehaviour
             
             if (tankMap.TryGetValue(targetTankID, out AquariumManager targetTankManager))
             {
-                // Wake up the matching container layout object if it was sleeping
                 if (!targetTankManager.gameObject.activeSelf)
                 {
                     targetTankManager.gameObject.SetActive(true);
@@ -317,7 +314,6 @@ public class SaveManager : MonoBehaviour
                         fishAI.currentScaleModifier = saved2DItem.fishScaleModifier > 0f ? saved2DItem.fishScaleModifier : fishAI.startingScale;
                         fishAI.facingDirectionSign = saved2DItem.fishFacingSign != 0f ? saved2DItem.fishFacingSign : 1f;
                         loaded2DInstance.transform.localScale = saved2DItem.localScale;
-
                         if (fishHungerField != null) fishHungerField.SetValue(fishAI, saved2DItem.fishHunger);
                         if (fishIsFullField != null) fishIsFullField.SetValue(fishAI, saved2DItem.fishIsFull);
                         if (fishFullnessTimerField != null) fishFullnessTimerField.SetValue(fishAI, saved2DItem.fishFullnessTimer);
@@ -332,7 +328,6 @@ public class SaveManager : MonoBehaviour
                         StartCoroutine(ApplyDelayedScale(loaded2DInstance, saved2DItem.localScale));
                     }
 
-                    // Dynamic Visibility Isolation Mask
                     if (!targetTankManager.isTankVisible)
                     {
                         foreach (Renderer rend in loaded2DInstance.GetComponentsInChildren<Renderer>()) rend.enabled = false;
@@ -366,7 +361,6 @@ public class SaveManager : MonoBehaviour
         {
             int workingChainIndex = loadedData.questChainIndex;
             int workingCount = loadedData.questCurrentCount;
-
             if (questChainIndexField != null) questChainIndexField.SetValue(QuestManager.Instance, workingChainIndex);
             if (questLoadMethod != null) questLoadMethod.Invoke(QuestManager.Instance, null);
 
@@ -378,7 +372,6 @@ public class SaveManager : MonoBehaviour
                     workingChainIndex++;
                     if (questChainIndexField != null) questChainIndexField.SetValue(QuestManager.Instance, workingChainIndex);
                     if (questLoadMethod != null) questLoadMethod.Invoke(QuestManager.Instance, null);
-
                     if (QuestManager.Instance.activeQuests != null && QuestManager.Instance.activeQuests.Count > 0)
                     {
                         QuestManager.Instance.activeQuests[0].currentCount = 0;
@@ -388,6 +381,23 @@ public class SaveManager : MonoBehaviour
                 {
                     loadedQuest.currentCount = workingCount;
                 }
+            }
+        }
+
+        // ===================================================================
+        // --- INTEGRATED: RESTORE PUBLIC SANCTUARY RANK STATISTICS ---
+        // ===================================================================
+        if (ExhibitPrestigeManager.Instance != null)
+        {
+            ExhibitPrestigeManager.Instance.currentLevel = loadedData.museumLevel > 0 ? loadedData.museumLevel : 1;
+            ExhibitPrestigeManager.Instance.currentPrestigePoints = loadedData.museumPrestigePoints;
+            ExhibitPrestigeManager.Instance.currentEntranceFee = loadedData.museumEntranceFee > 0 ? loadedData.museumEntranceFee : 15;
+
+            // Instantly tell your 3D HUD script to redraw on-screen level cards
+            HUD3DController localHUD = FindFirstObjectByType<HUD3DController>();
+            if (localHUD != null)
+            {
+                localHUD.UpdatePrestigeVisuals();
             }
         }
 

@@ -64,11 +64,23 @@ public class ExhibitTicketGate : MonoBehaviour
 
         if (activeVisitor != null)
         {
-            if (ExhibitPrestigeManager.Instance != null && GlobalEconomyManager.Instance != null)
+            // ===================================================================
+            // --- THE DIRECTIONAL PROTECTION FILTER ---
+            // Only process the ticket transaction if the visitor is NOT currently 
+            // in the process of leaving the museum building!
+            // ===================================================================
+            if (activeVisitor.currentState != VisitorAI.VisitorState.Leaving)
             {
-                int ticketIncome = ExhibitPrestigeManager.Instance.currentEntranceFee;
-                GlobalEconomyManager.Instance.AddMoney(ticketIncome);
-                Debug.Log($"<color=#66FF66>[Lobby Gate]</color> {other.gameObject.name} crossed turnstiles! Deposited Entrance Ticket Price: <b>+${ticketIncome}</b>");
+                if (ExhibitPrestigeManager.Instance != null && GlobalEconomyManager.Instance != null)
+                {
+                    int ticketIncome = ExhibitPrestigeManager.Instance.currentEntranceFee;
+                    GlobalEconomyManager.Instance.AddMoney(ticketIncome);
+                    Debug.Log($"<color=#66FF66>[Lobby Gate]</color> {other.gameObject.name} crossed turnstiles! Deposited Entrance Ticket Price: <b>+${ticketIncome}</b>");
+                }
+            }
+            else
+            {
+                Debug.Log($"[Lobby Gate] {other.gameObject.name} passed through exit turnstiles. Skipping double-charge logic.");
             }
         }
     }
