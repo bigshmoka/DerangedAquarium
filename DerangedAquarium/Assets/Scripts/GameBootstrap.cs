@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement; // Integrated for explicit world redirection
 
 public static class GameBootstrap
 {
@@ -26,5 +27,14 @@ public static class GameBootstrap
                 Debug.LogError("[Bootstrap] CRITICAL: Could not find a prefab named '--- GLOBAL SYSTEM ---' inside a 'Resources' folder! Please check your naming and path setups.");
             }
         }
+
+        // ===================================================================
+        // --- THE FIXED REDIRECTION LINE ---
+        // Force-intercepts Unity's initial scene load sequence. No matter what 
+        // scene tab you are editing, pressing Play will now instantly redirect
+        // execution straight to your 3D storefront showroom floor!
+        // ===================================================================
+        Debug.Log("<color=yellow>[Bootstrap]</color> Overriding editor scene context. Forcing direct boot into 3D World space...");
+        SceneManager.LoadScene("Shop3DScene");
     }
 }
