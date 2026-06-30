@@ -15,6 +15,25 @@ public class PlayerController3D : MonoBehaviour
     // Custom gravity pulls you down smoothly without needing Unity's gravity checkbox!
     public float customGravity = -15f; 
 
+    [Header("Head Bobbing Settings")]
+    [Tooltip("How fast the head bobs up and down while walking.")]
+    public float walkBobFrequency = 14f;
+    [Tooltip("How high/low the camera bobs while walking.")]
+    public float walkBobAmount = 0.04f;
+
+    [Tooltip("How fast the head bobs up and down while sprinting.")]
+    public float sprintBobFrequency = 18f;
+    [Tooltip("How high/low the camera bobs while sprinting.")]
+    public float sprintBobAmount = 0.08f;
+
+    [Tooltip("How fast the head bobs up and down while crouching.")]
+    public float crouchBobFrequency = 9f;
+    [Tooltip("How high/low the camera bobs while crouching.")]
+    public float crouchBobAmount = 0.02f;
+
+    [Tooltip("How fast the camera returns to center when you stop moving.")]
+    public float bobResetReturnSpeed = 15f;
+
     [Header("References")]
     public Transform playerCamera;
 
@@ -31,9 +50,11 @@ public class PlayerController3D : MonoBehaviour
     private bool readyToJump = false;
     private bool isGrounded = false;
     
-    // --- CAMERA CROUCH TRACKERS ---
+    // --- CAMERA EFFECTS ENGINE FIELDS ---
     private float standingCamHeight;
     private float crouchingCamHeight;
+    private float baseCameraY;
+    private float bobTimer = 0f;
 
     void Start()
     {
@@ -53,6 +74,7 @@ public class PlayerController3D : MonoBehaviour
         {
             standingCamHeight = playerCamera.localPosition.y;
             crouchingCamHeight = standingCamHeight * 0.5f;
+            baseCameraY = standingCamHeight; // Initialize base slider tracker
         }
 
         Cursor.lockState = CursorLockMode.Locked;
@@ -106,8 +128,8 @@ public class PlayerController3D : MonoBehaviour
             readyToJump = false;
         }
 
-        // 4. Smooth Camera Crouch (Runs in Update so it works mid-air or on ground!)
-        HandleSmoothCameraCrouch();
+        // 4. Combined Camera Couch Stance & Head Bobbing Engine
+        HandleCameraEffectsAndBobbing();
     }
 
     void FixedUpdate()
@@ -145,12 +167,6 @@ public class PlayerController3D : MonoBehaviour
 
         Vector3 moveDirection = (transform.forward * moveZ + transform.right * moveX).normalized;
         
-        // ===================================================================
-        // --- FIXED: GROUND-GATED STANCE SPEED SELECTION ---
-        // Determines target velocity relative to ground contact states.
-        // Sprint modifier applies globally, but the crouch speed slow-down penalty 
-        // is strictly gated behind being firmly touching the floor plates!
-        // ===================================================================
         float currentSpeed = moveSpeed;
 
         if (Input.GetKey(KeyCode.LeftShift)) 
@@ -158,7 +174,6 @@ public class PlayerController3D : MonoBehaviour
             currentSpeed = sprintSpeed;
         }
 
-        // If crouching but in mid-air (isGrounded == false), this speed penalty is completely bypassed!
         if (isCrouching && isGrounded) 
         {
             currentSpeed = crouchSpeed;
@@ -170,69 +185,102 @@ public class PlayerController3D : MonoBehaviour
 
             if (readyToJump)
             {
-                // Shoot upward instantly
                 currentYVelocity = jumpForce;
                 readyToJump = false; 
             }
             else if (!isGrounded)
             {
-                // Pull downward over time if we are in mid-air via our custom gravity engine
                 currentYVelocity += customGravity * Time.fixedDeltaTime;
             }
             else 
             {
-                // Set velocity to exactly 0 when on the ground to clear stutters
                 currentYVelocity = 0f; 
             }
 
-            // Apply the calculated Y velocity alongside your ground-gated horizontal momentum speeds
             Vector3 targetVelocity = new Vector3(moveDirection.x * currentSpeed, currentYVelocity, moveDirection.z * currentSpeed);
             rb.linearVelocity = targetVelocity;
         }
     }
 
-    // ===================================================================
-    // --- THE UNIVERSAL GROUND CHECK ---
-    // Mathematically locates the absolute bottom of your player collider
-    // and checks precisely below it. Works completely independent of pivot points.
-    // ===================================================================
     private bool IsGroundedUniversal()
     {
         if (playerCollider == null) return true; 
 
-        // Find the absolute lowest world-space point of your collider (the bottom of your feet)
         Vector3 bottomPoint = new Vector3(transform.position.x, playerCollider.bounds.min.y, transform.position.z);
-
-        // Start checking slightly above the bottom edge so the ray doesn't clip underneath the floor
         Vector3 startPoint = bottomPoint + (Vector3.up * 0.1f);
         float checkDistance = 0.2f;
 
-        // Raycast against EVERYTHING (~0), ignoring invisible triggers
         RaycastHit[] hits = Physics.RaycastAll(startPoint, Vector3.down, checkDistance, ~0, QueryTriggerInteraction.Ignore);
 
         foreach (RaycastHit hit in hits)
         {
-            // Ignore hitting ourselves
             if (hit.collider == playerCollider) continue;
             if (hit.transform.IsChildOf(transform)) continue;
 
-            // If we hit anything else physical, we are firmly on the ground
             return true; 
         }
 
         return false;
     }
 
-    // Camera height interpolation engine translates view paths smoothly
-    private void HandleSmoothCameraCrouch()
+    // ===================================================================
+    // --- ADVANCED CAMERA EFFECTS ENGINE (Crouch Stance + Head Bob) ---
+    // Simulates natural organic weight shifting while walking.
+    // Seamlessly handles transitioning heights without fighting crouch code arrays!
+    // ===================================================================
+    private void HandleCameraEffectsAndBobbing()
     {
         if (playerCamera == null) return;
 
-        float targetY = isCrouching ? crouchingCamHeight : standingCamHeight;
-        Vector3 camPos = playerCamera.localPosition;
-        
-        camPos.y = Mathf.Lerp(camPos.y, targetY, Time.deltaTime * crouchLerpSpeed);
-        playerCamera.localPosition = camPos;
+        // 1. STANCE COMPILER: Smoothly slide the baseline height anchor based on crouch states
+        float targetBaseY = isCrouching ? crouchingCamHeight : standingCamHeight;
+        baseCameraY = Mathf.Lerp(baseCameraY, targetBaseY, Time.deltaTime * crouchLerpSpeed);
+
+        // Prepare our baseline targeted point vector
+        Vector3 targetLocalPosition = new Vector3(0f, baseCameraY, playerCamera.localPosition.z);
+
+        // 2. CHECK MOTION INPUTS: Are we moving the joystick or WASD keys?
+        float moveInputX = Input.GetAxisRaw("Horizontal");
+        float moveInputZ = Input.GetAxisRaw("Vertical");
+        bool isInputMoving = (Mathf.Abs(moveInputX) > 0.1f || Mathf.Abs(moveInputZ) > 0.1f);
+
+        // Gating conditions: Only play head bobs if grounded, not floating in noclip, and actively moving
+        if (isGrounded && !isNoclip && isInputMoving)
+        {
+            // Pick our configuration modifiers matching our active locomotion state
+            float activeFrequency = walkBobFrequency;
+            float activeAmount = walkBobAmount;
+
+            if (Input.GetKey(KeyCode.LeftShift))
+            {
+                activeFrequency = sprintBobFrequency;
+                activeAmount = sprintBobAmount;
+            }
+            else if (isCrouching)
+            {
+                activeFrequency = crouchBobFrequency;
+                activeAmount = crouchBobAmount;
+            }
+
+            // Advance the periodic timer tracking step intervals
+            bobTimer += Time.deltaTime * activeFrequency;
+
+            // Generate structural wave displacements
+            float waveOffsetY = Mathf.Sin(bobTimer) * activeAmount; 
+            float waveOffsetX = Mathf.Cos(bobTimer * 0.5f) * (activeAmount * 0.6f); // Shifting weight side-to-side
+
+            // Inject structural offsets into target transformation matrix positions
+            targetLocalPosition.x += waveOffsetX;
+            targetLocalPosition.y += waveOffsetY;
+        }
+        else
+        {
+            // Reset the internal clock smoothly when sitting completely still so steps don't look stuttered on initialization
+            bobTimer = Mathf.Lerp(bobTimer, 0f, Time.deltaTime * bobResetReturnSpeed);
+        }
+
+        // 3. APPLY LAYER SHIFT: Interpolate view transforms seamlessly to filter out physics tremors
+        playerCamera.localPosition = Vector3.Lerp(playerCamera.localPosition, targetLocalPosition, Time.deltaTime * bobResetReturnSpeed);
     }
 
     public void SetPlayerLockState(bool shouldLock)
