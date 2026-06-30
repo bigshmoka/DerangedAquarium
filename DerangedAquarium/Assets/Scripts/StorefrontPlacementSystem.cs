@@ -84,7 +84,6 @@ public class StorefrontPlacementSystem : MonoBehaviour
             col.enabled = false;
         }
 
-        // --- PREVIEW PROTECTION SHIELD ---
         TankInteraction3D ghostTankComp = ghostPreviewInstance.GetComponentInChildren<TankInteraction3D>();
         if (ghostTankComp != null)
         {
@@ -113,51 +112,110 @@ public class StorefrontPlacementSystem : MonoBehaviour
         Ray cameraRay = new Ray(Camera.main.transform.position, Camera.main.transform.forward);
         RaycastHit surfaceHit;
 
-        // ===================================================================
-        // --- FIXED: MODULAR PER-PREFAB HEIGHT OFFSET DETECTION ---
-        // Searches the selected ghost structure for our new modular script.
-        // If present, it extracts the custom offset; otherwise, it defaults to 0f.
-        // ===================================================================
+        // Modular per-prefab height offset detection engine
         float localPrefabOffset = 0f;
         PlacementHeightOffset offsetComp = ghostPreviewInstance.GetComponent<PlacementHeightOffset>();
         if (offsetComp == null) offsetComp = ghostPreviewInstance.GetComponentInChildren<PlacementHeightOffset>();
         if (offsetComp != null) localPrefabOffset = offsetComp.heightOffset;
 
+        Vector3 targetPosition;
+        Vector3 targetNormal = Vector3.up;
+        bool foundSurface = false;
+
+        // 1. Primary Check: Direct crosshair raycast hit on your floor layer surface
         if (Physics.Raycast(cameraRay, out surfaceHit, maxPlacementDistance, floorSurfaceLayer))
         {
-            ghostPreviewInstance.SetActive(true);
-            
-            // Apply raycast hit position combined with your custom asset offset
-            ghostPreviewInstance.transform.position = surfaceHit.point + new Vector3(0f, localPrefabOffset, 0f);
-            
-            Quaternion floorSlopeAlignment = Quaternion.FromToRotation(Vector3.up, surfaceHit.normal);
-            Quaternion playerRotationOffset = Quaternion.Euler(0f, customRotationY, 0f);
-            
-            ghostPreviewInstance.transform.rotation = floorSlopeAlignment * playerRotationOffset;
+            targetPosition = surfaceHit.point;
+            targetNormal = surfaceHit.normal;
+            foundSurface = true;
         }
         else
         {
-            Vector3 fallbackTarget = cameraRay.GetPoint(maxPlacementDistance);
-            Ray downRay = new Ray(new Vector3(fallbackTarget.x, Camera.main.transform.position.y + 4f, fallbackTarget.z), Vector3.down);
-            RaycastHit downHit;
-
-            if (Physics.Raycast(downRay, out downHit, 25f, floorSurfaceLayer))
+            // 2. Fallback: Intersect with a mathematical flat floor plane to avoid sky/wall glitching
+            float floorBaselineY = 0f;
+            if (StorefrontBoundaryShield.Instance != null && StorefrontBoundaryShield.Instance.shopBoundaryCollider != null)
             {
-                ghostPreviewInstance.SetActive(true);
-                
-                // Apply fallback ground hit position combined with your custom asset offset
-                ghostPreviewInstance.transform.position = downHit.point + new Vector3(0f, localPrefabOffset, 0f);
-                
-                Quaternion floorSlopeAlignment = Quaternion.FromToRotation(Vector3.up, downHit.normal);
-                Quaternion playerRotationOffset = Quaternion.Euler(0f, customRotationY, 0f);
-                
-                ghostPreviewInstance.transform.rotation = floorSlopeAlignment * playerRotationOffset;
+                floorBaselineY = StorefrontBoundaryShield.Instance.shopBoundaryCollider.bounds.min.y;
+            }
+
+            Plane floorPlane = new Plane(Vector3.up, new Vector3(0f, floorBaselineY, 0f));
+            float rayDistance;
+
+            if (floorPlane.Raycast(cameraRay, out rayDistance) && rayDistance <= maxPlacementDistance)
+            {
+                targetPosition = cameraRay.GetPoint(rayDistance);
+                foundSurface = true;
             }
             else
             {
-                ghostPreviewInstance.SetActive(false);
+                // If looking directly up into empty space, project a clean horizontal horizon vector forward
+                Vector3 horizontalForward = Camera.main.transform.forward;
+                horizontalForward.y = 0f; // Force vertical flattening
+                
+                if (horizontalForward.sqrMagnitude < 0.01f) 
+                {
+                    horizontalForward = Camera.main.transform.up;
+                    horizontalForward.y = 0f;
+                }
+                horizontalForward.Normalize();
+
+                // Lock position directly onto your floor height at max cursor reach boundaries
+                targetPosition = new Vector3(Camera.main.transform.position.x, floorBaselineY, Camera.main.transform.position.z) + (horizontalForward * maxPlacementDistance);
+                foundSurface = true;
             }
         }
+
+        if (foundSurface)
+        {
+            ghostPreviewInstance.SetActive(true);
+
+            // Apply specific asset model pivot height offsets
+            targetPosition.y += localPrefabOffset;
+
+            // ===================================================================
+            // --- THE ROTATION FIX SYSTEM ---
+            // 1. Calculate and apply the rotation transformations FIRST so the ghost
+            //    preview shifts physical orientations before calculating boundaries.
+            // ===================================================================
+            Quaternion floorSlopeAlignment = Quaternion.FromToRotation(Vector3.up, targetNormal);
+            Quaternion playerRotationOffset = Quaternion.Euler(0f, customRotationY, 0f);
+            ghostPreviewInstance.transform.rotation = floorSlopeAlignment * playerRotationOffset;
+
+            // 2. Extract the true real-time world size bounding box from the rotated object
+            Vector3 realTimeRotatedSize = GetGhostWorldSize();
+
+            // 3. Run coordinates through the boundary clamp shield using the dynamic size
+            if (StorefrontBoundaryShield.Instance != null)
+            {
+                targetPosition = StorefrontBoundaryShield.Instance.GetClampedPlacementPosition(targetPosition, realTimeRotatedSize);
+            }
+
+            ghostPreviewInstance.transform.position = targetPosition;
+        }
+        else
+        {
+            ghostPreviewInstance.SetActive(false);
+        }
+    }
+
+    /// <summary>
+    /// Calculates the dynamic axis-aligned world size of the ghost preview asset based on its current rotation.
+    /// </summary>
+    private Vector3 GetGhostWorldSize()
+    {
+        if (ghostPreviewInstance == null) return Vector3.one;
+
+        Renderer[] renderers = ghostPreviewInstance.GetComponentsInChildren<Renderer>();
+        if (renderers.Length == 0) return Vector3.one;
+
+        // Encapsulate all child renderers to compute total structural thickness along world axes
+        Bounds combinedBounds = renderers[0].bounds;
+        for (int i = 1; i < renderers.Length; i++)
+        {
+            combinedBounds.Encapsulate(renderers[i].bounds);
+        }
+
+        return combinedBounds.size;
     }
 
     private void ConfirmPlacement()
@@ -172,7 +230,6 @@ public class StorefrontPlacementSystem : MonoBehaviour
             foreach (TankInteraction3D existing in existingTanks)
             {
                 if (ghostPreviewInstance != null && existing.transform.IsChildOf(ghostPreviewInstance.transform)) continue;
-
                 if (existing.tankID == tankComp.tankID)
                 {
                     StorefrontShopUI shopUI = FindFirstObjectByType<StorefrontShopUI>();
@@ -199,7 +256,7 @@ public class StorefrontPlacementSystem : MonoBehaviour
 
             GameObject placedObject = Instantiate(selectedPrefab, ghostPreviewInstance.transform.position, ghostPreviewInstance.transform.rotation, activeParentContainer);
             placedObject.name = selectedPrefab.name + "_Placed";
-
+            
             PlacedItemData itemData = placedObject.AddComponent<PlacedItemData>();
             itemData.originalCost = currentItemCost;
 
@@ -236,7 +293,6 @@ public class StorefrontPlacementSystem : MonoBehaviour
     private void EndPlacementWorkflow()
     {
         if (ghostPreviewInstance != null) Destroy(ghostPreviewInstance);
-
         isPlacing = false;
         selectedPrefab = null;
 
